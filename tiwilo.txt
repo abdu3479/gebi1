@@ -1,0 +1,25 @@
+tiwilo token=520f745a2723cb26f84884cf32a50498
+Account SID = AC6e9b8900825d5bcfcd5da7bd31197d39
+tiwilo phone  =+12295970703
+sid =SK261e7042393fbd1859b8a6ce60afeb2e
+secret=K0UmCKh8Ufp9xoXhiX52Dn8RsbYlYXtu
+
+ secret=K0UmCKh8Ufp9xoXhiX52Dn8RsbYlYXtu 
+Test credentials
+Account SID- used to exercise the REST API
+AC06e1a1db483218b7f44995533e988319
+Test Auth token
+
+f342674f3395267269fb58189f924571
+
+
+
+Live credentials
+Account SID- used to exercise the REST API
+AC6e9b8900825d5bcfcd5da7bd31197d39
+Auth token
+
+Request a secondary token
+Sensitive information. Store your token securely to protect your account. Learn more
+
+520f745a2723cb26f84884cf32a50498

@@ -1,0 +1,28 @@
+{
+    "name": "werabe/land-lease",
+    "description": "Werabe Land Lease System",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Werabe\\LandLease\\": [
+                "classes/",
+                "config/",
+                "includes/"
+            ]
+        }
+    },
+    "authors": [
+        {
+            "name": "mame",
+            "email": "mameserag@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "guzzlehttp/guzzle": "^7.9",
+        "phpseclib/phpseclib": "^3.0",
+        "vlucas/phpdotenv": "^5.4",
+        "twilio/sdk": "^8.5"
+    }
+}

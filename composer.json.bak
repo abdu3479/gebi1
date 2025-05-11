@@ -1,0 +1,25 @@
+{
+    "name": "werabe/land-lease",
+    "description": "Werabe Land Lease System",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Werabe\\LandLease\\": [
+                "classes/",
+                "config/",
+                "includes/"
+            ]
+        }
+    },
+    "authors": [
+        {
+            "name": "mame",
+            "email": "mameserag@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "twilio/sdk": "^7.0"
+    }
+}

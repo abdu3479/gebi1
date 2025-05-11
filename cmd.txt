@@ -1,0 +1,210 @@
+
+cmd to cheack list of directories
+C:\xampp\htdocs\Alwerabe>dir /s C:\xampp\htdocs\*.php
+ Volume in drive C has no label.
+ Volume Serial Number is 9609-929F
+
+ Directory of C:\xampp\htdocs
+
+07/16/2015  07:32 AM               260 index.php
+               1 File(s)            260 bytes
+
+ Directory of C:\xampp\htdocs\Alwerabe
+
+04/01/2025  08:27 AM             5,841 admin_dashboard.php
+03/31/2025  07:38 AM             3,656 admin_functions.php
+04/15/2025  11:19 AM             2,308 auth.php
+03/30/2025  12:27 PM             1,951 auth_functions.php
+03/29/2025  01:41 PM             6,913 comments.php
+04/03/2025  12:20 PM             1,040 config.php
+03/30/2025  12:25 PM             7,149 create_post.php
+04/04/2025  02:57 AM               572 db_connect.php
+03/30/2025  08:55 AM            28,584 explore.php
+03/30/2025  10:21 AM            92,051 facebok.php
+03/30/2025  09:56 AM            67,134 facebook.php
+03/31/2025  10:09 AM               363 fb-callback.php
+03/30/2025  11:33 AM               708 functions.php
+04/02/2025  08:16 AM             2,487 get_messages.php
+04/02/2025  08:19 AM            62,111 home.php
+04/28/2025  09:55 AM            66,157 index.php
+04/15/2025  07:44 PM            68,090 index1.php
+04/04/2025  08:15 AM           140,050 index2.php
+04/15/2025  11:17 AM             3,920 login.php
+03/30/2025  11:35 AM               199 logout.php
+04/02/2025  05:11 AM            10,374 marketplace.php
+03/30/2025  04:01 AM            37,799 media.php
+04/02/2025  04:29 AM             8,876 memories.php
+04/02/2025  08:12 AM            17,801 messenger.php
+03/31/2025  02:26 AM             6,283 notifications.php
+04/02/2025  04:36 AM             8,578 pages.php
+03/31/2025  01:49 AM            68,041 posts.php
+03/31/2025  06:10 AM            49,705 posts_history.php
+04/02/2025  04:50 AM            12,896 post_view.php
+03/31/2025  02:34 AM            17,432 profile.php
+03/29/2025  02:03 PM             7,061 pubposts.php
+03/29/2025  01:41 PM             7,307 reactions.php
+03/31/2025  10:02 AM            18,407 register.php
+03/31/2025  07:31 AM             3,685 settings.php
+04/01/2025  08:42 AM            11,584 social_features.php
+04/02/2025  02:31 AM            29,498 template.php
+04/02/2025  07:56 AM             1,444 update_conversations.php
+              37 File(s)        878,055 bytes
+
+ Directory of C:\xampp\htdocs\Alwerabe\admin
+
+04/01/2025  12:36 PM             4,146 admin1_dashboard.php
+03/31/2025  08:41 AM            24,159 admin_actions.php
+04/01/2025  05:51 AM               491 admin_auth.php
+04/01/2025  12:21 PM             4,364 admin_dashboard.php
+04/01/2025  05:59 AM            21,739 admin_followers.php
+03/31/2025  08:13 AM             1,634 admin_footer.php
+04/01/2025  09:43 AM             3,625 admin_login.php
+03/31/2025  07:58 AM            17,989 admin_notifications.php
+03/31/2025  08:07 AM            23,395 admin_profile.php
+04/01/2025  06:41 AM            16,145 admin_roles.php
+03/31/2025  08:09 AM            30,388 admin_sales.php
+03/31/2025  08:12 AM             5,049 admin_scripts.php
+03/31/2025  08:28 AM            42,761 admin_user_view.php
+04/02/2025  12:01 AM            25,932 analytics.php
+04/01/2025  11:42 PM            36,162 ban_unban.php
+04/01/2025  10:23 AM               533 conn.php
+04/01/2025  11:30 AM             2,566 dashboard.php
+04/01/2025  06:53 AM             5,038 functions.php
+04/01/2025  11:21 AM             4,384 index.php
+04/01/2025  12:54 PM             1,403 insert_super_admin.php
+04/01/2025  12:56 PM             3,465 login.php
+04/01/2025  07:38 AM               236 logout.php
+04/01/2025  12:36 PM             6,492 manage_contents.php
+04/01/2025  12:36 PM             2,916 manage_posts.php
+04/02/2025  12:35 AM            18,299 manage_roles.php
+04/02/2025  05:04 AM            19,618 manage_users.php
+04/01/2025  12:37 PM             2,555 moderator_dashboard.php
+04/01/2025  05:42 AM             4,695 navbar.php
+04/01/2025  11:25 AM             3,485 profile.php
+04/01/2025  12:38 PM             5,862 register.php
+04/01/2025  11:24 AM             4,828 reports.php
+04/01/2025  11:35 PM             5,748 settings.php
+03/31/2025  07:53 AM            14,147 sidebar.php
+04/02/2025  12:14 AM            41,897 super_admin_dashboard.php
+04/01/2025  11:03 PM            14,238 user_followers.php
+04/01/2025  11:34 PM            14,320 user_following.php
+04/01/2025  10:53 PM            25,839 view_user.php
+              37 File(s)        460,543 bytes
+
+ Directory of C:\xampp\htdocs\Alwerabe\includes
+
+04/01/2025  02:43 AM             6,964 admin_auth.php
+03/29/2025  01:38 PM               386 db_connect.php
+04/01/2025  08:36 AM             2,550 functions.php
+               3 File(s)          9,900 bytes
+
+ Directory of C:\xampp\htdocs\attendance
+
+04/24/2025  06:33 PM             3,387 index.php
+04/24/2025  06:31 PM             4,356 login_with_face.php
+04/24/2025  06:33 PM               774 logout.php
+04/24/2025  06:34 PM               791 mark_absentees.php
+04/24/2025  06:35 PM             1,919 register_employee.php
+04/24/2025  06:40 PM             8,855 schedule.php
+04/24/2025  06:46 PM             8,848 shift.php
+               7 File(s)         28,930 bytes
+
+ Directory of C:\xampp\htdocs\attendance\includes
+
+04/24/2025  06:31 PM               342 db.php
+               1 File(s)            342 bytes
+
+ Directory of C:\xampp\htdocs\dashboard
+
+11/22/2022  07:37 AM                21 phpinfo.php
+               1 File(s)             21 bytes
+
+ Directory of C:\xampp\htdocs\EMS
+
+04/27/2025  11:55 AM             2,022 dashboard.php
+04/27/2025  02:55 PM             1,416 enroll_employee.php
+04/27/2025  02:54 PM             2,513 face_auth.php
+04/27/2025  11:51 AM               351 index.php
+04/27/2025  02:56 PM               484 init_faceset.php
+04/27/2025  06:15 PM            10,512 login_with_face.php
+04/27/2025  11:56 AM                86 logout.php
+04/27/2025  11:57 AM             2,114 mark_absences.php
+04/27/2025  07:26 PM            14,168 register_employee.php
+04/27/2025  05:26 PM               921 rotate_logs.php
+04/27/2025  11:57 AM               692 test_email.php
+04/27/2025  05:10 PM               947 test_facepp.php
+04/26/2025  12:19 PM               396 test_gd.php
+              13 File(s)         36,622 bytes
+
+ Directory of C:\xampp\htdocs\EMS\includes
+
+04/27/2025  06:26 PM               534 config.php
+               1 File(s)            534 bytes
+
+ Directory of C:\xampp\htdocs\EMS\lib
+
+08/30/2023  05:36 PM             6,035 Adapter.php
+08/30/2023  05:36 PM               298 ContentTypes.php
+08/30/2023  05:36 PM             9,577 FppClient.php
+08/30/2023  05:36 PM             7,773 Image.php
+08/30/2023  05:36 PM             1,660 log.php
+08/30/2023  05:36 PM            10,584 MimeTypes.php
+08/30/2023  05:36 PM             3,538 MultiPartForm.php
+08/30/2023  05:36 PM             5,494 Request.php
+08/30/2023  05:36 PM                70 RequestException.php
+08/30/2023  05:36 PM             1,634 Response.php
+              10 File(s)         46,663 bytes
+
+ Directory of C:\xampp\htdocs\EMS\lib\facepp-sdk
+
+08/30/2023  05:36 PM             9,577 FppClient.php
+               1 File(s)          9,577 bytes
+
+ Directory of C:\xampp\htdocs\EMS\lib\facepp-sdk\lib
+
+08/30/2023  05:36 PM             6,035 Adapter.php
+08/30/2023  05:36 PM               298 ContentTypes.php
+08/30/2023  05:36 PM             7,773 Image.php
+08/30/2023  05:36 PM             1,660 log.php
+08/30/2023  05:36 PM            10,584 MimeTypes.php
+08/30/2023  05:36 PM             3,538 MultiPartForm.php
+08/30/2023  05:36 PM             5,494 Request.php
+08/30/2023  05:36 PM                70 RequestException.php
+08/30/2023  05:36 PM             1,634 Response.php
+               9 File(s)         37,086 bytes
+
+ Directory of C:\xampp\htdocs\EMS\lib\facepp-sdk\tests
+
+08/30/2023  05:36 PM                60 test.php
+08/30/2023  05:36 PM               890 test_adapter.php
+08/30/2023  05:36 PM            10,236 test_client.php
+08/30/2023  05:36 PM               306 test_multipartform.php
+08/30/2023  05:36 PM               942 test_segment.php
+               5 File(s)         12,434 bytes
+
+ Directory of C:\xampp\htdocs\EMS\PHPMailer-master
+
+04/24/2025  07:19 AM             6,261 get_oauth_token.php
+               1 File(s)          6,261 bytes
+
+ Directory of C:\xampp\htdocs\EMS\PHPMailer-master\language
+
+04/24/2025  07:19 AM             1,584 phpmailer.lang-af.php
+04/24/2025  07:19 AM             2,024 phpmailer.lang-ar.php
+04/24/2025  07:19 AM             3,792 phpmailer.lang-as.php
+04/24/2025  07:19 AM             1,749 phpmailer.lang-az.php
+04/24/2025  07:19 AM             1,745 phpmailer.lang-ba.php
+04/24/2025  07:19 AM             2,178 phpmailer.lang-be.php
+04/24/2025  07:19 AM             2,196 phpmailer.lang-bg.php
+04/24/2025  07:19 AM             3,845 phpmailer.lang-bn.php
+04/24/2025  07:19 AM             1,730 phpmailer.lang-ca.php
+04/24/2025  07:19 AM             1,798 phpmailer.lang-cs.php
+04/24/2025  07:19 AM             2,409 phpmailer.lang-da.php
+04/24/2025  07:19 AM             1,886 phpmailer.lang-de.php
+04/24/2025  07:19 AM             3,307 phpmailer.lang-el.php
+04/24/2025  07:19 AM             1,665 phpmailer.lang-eo.php
+04/24/2025  07:19 AM             2,588 phpmailer.lang-es.php
+04/24/2025  07:19 AM             1,744 phpmailer.lang-et.php
+04/24/2025  07:19 AM             2,079 phpmailer.lang-fa.php
+04/24/2025  07:19 AM             1,659 phpmailer.lang-fi.php
+04/24/2025  07:19 AM             1,637 phpmailer.lang-fo.php
