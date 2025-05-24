@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="hold-transition login-page">
 <div class="login-box">
     <div class="login-logo">
-        <a href="#"><b><?php echo ($_SESSION['lang'] ?? 'en') === 'am' ? 'ወራቤ መሬት ሊዝ' : 'Werabe Land Lease'; ?></b></a>
+        <a href="#"><b><?php echo ($_SESSION['lang'] ?? 'en') === 'am' ? 'ወራቤ መሬት ሊዝ' : 'PMT'; ?></b></a>
     </div>
     <div class="card">
         <div class="card-body login-card-body">

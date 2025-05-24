@@ -526,6 +526,14 @@ if (in_array($role, ['admin', 'billing_officer'])) {
                             </a>
                         </li>
                     <?php endif; ?>
+                    <?php if (!$is_viewer): ?>
+                        <li class="nav-item">
+                            <a href="tax/dashboard.php" class="nav-link <?php echo $current_page === 'dashboard.php' ? 'active' : ''; ?>">
+                                <i class="nav-icon fas fa-plus"></i>
+                                <p class="amharic"><?php echo htmlspecialchars($translations[$lang]['tax'] ?? ($lang === 'am' ? 'መዝገቦችን ይፍጠሩ' : 'tax')); ?></p>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                 </ul>
             </nav>
         </div>

@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Land Management Dashboard - AdminLTE 3</title>
+  <!-- AdminLTE 3 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <!-- Custom CSS -->
+  <style>
+    .modal-body input, .modal-body select, .modal-body .custom-file {
+      margin-bottom: 15px;
+    }
+    .table th, .table td {
+      vertical-align: middle;
+    }
+    .table-responsive {
+      overflow-x: auto;
+    }
+    .search-box {
+      margin-bottom: 20px;
+    }
+    .chart-container {
+      max-width: 500px;
+      margin: 20px auto;
+    }
+    .error {
+      color: red;
+      font-size: 0.9em;
+      display: none;
+    }
+    .report-preview {
+      max-height: 400px;
+      overflow-y: auto;
+      background: #f8f9fa;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+  <div class="wrapper">
+    <!-- Preloader -->
+    <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="https://adminlte.io/themes/v3/dist/img/AdminLTELogo.png" alt="AdminLTELogo" height="60" width="60">
+    </div>
+
+    <!-- Navbar -->
+    <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="#" data-toggle="modal" data-target="#logoutModal">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Sidebar -->
+    <aside class="main-sidebar sidebar-dark-primary elevation-4">
+      <a href="#" class="brand-link">
+        <img src="assets/images/logo.jpg" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
+        <span class="brand-text font-weight-light">Land Management</span>
+      </a>
+      <div class="sidebar">
+        <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+          <div class="image">
+            <img src="assets/images/m3.png" class="img-circle elevation-2" alt="User Image">
+          </div>
+          <div class="info">
+            <a href="#" class="d-block">Admin User</a>
+          </div>
+        </div>
+        <nav class="mt-2">
+          <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+            <li class="nav-item">
+              <a href="#transfers" class="nav-link active">
+                <i class="nav-icon fas fa-exchange-alt"></i>
+                <p>Transfers</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#proxies" class="nav-link">
+                <i class="nav-icon fas fa-user-shield"></i>
+                <p>Proxies</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#users" class="nav-link">
+                <i class="nav-icon fas fa-users"></i>
+                <p>Users</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#assets" class="nav-link">
+                <i class="nav-icon fas fa-map"></i>
+                <p>Land Assets</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#bills" class="nav-link">
+                <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                <p>Bills & Payments</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#reports" class="nav-link">
+                <i class="nav-icon fas fa-file-pdf"></i>
+                <p>Reports</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#audit" class="nav-link">
+                <i class="nav-icon fas fa-history"></i>
+                <p>Audit Log</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="#analytics" class="nav-link">
+                <i class="nav-icon fas fa-chart-pie"></i>
+                <p>Analytics</p>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+      <!-- Content Header -->
+      <div class="content-header">
+        <div class="container-fluid">
+          <div class="row mb-2">
+            <div class="col-sm-6">
+              <h1 class="m-0">Dashboard</h1>
+            </div>
+            <div class="col-sm-6">
+              <ol class="breadcrumb float-sm-right">
+                <li class="breadcrumb-item"><a href="#">Home</a></li>
+                <li class="breadcrumb-item active">Dashboard</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <section class="content">
+        <div class="container-fluid">
+          <!-- Transfers Section -->
+          <div class="card" id="transfers">
+            <div class="card-header">
+              <h3 class="card-title">Land Transfers</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addTransferModal">
+                  <i class="fas fa-plus"></i> Add Transfer
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-box">
+                <input type="text" class="form-control" id="transferSearch" placeholder="Search by Transfer ID or Owner">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>Transfer ID</th>
+                      <th>Asset Code</th>
+                      <th>Previous Owner</th>
+                      <th>New Owner</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th>Document</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transferTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Proxies Section -->
+          <div class="card" id="proxies">
+            <div class="card-header">
+              <h3 class="card-title">Proxies</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addProxyModal">
+                  <i class="fas fa-plus"></i> Add Proxy
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-box">
+                <input type="text" class="form-control" id="proxySearch" placeholder="Search by Proxy ID or Owner">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>Proxy ID</th>
+                      <th>Asset Code</th>
+                      <th>Owner</th>
+                      <th>Proxy Agent</th>
+                      <th>Type</th>
+                      <th>Duration</th>
+                      <th>Status</th>
+                      <th>Document</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="proxyTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Users Section -->
+          <div class="card" id="users">
+            <div class="card-header">
+              <h3 class="card-title">Users</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addUserModal">
+                  <i class="fas fa-plus"></i> Add User
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-box">
+                <input type="text" class="form-control" id="userSearch" placeholder="Search by User ID or Name">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Name</th>
+                      <th>Role</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="userTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Land Assets Section -->
+          <div class="card" id="assets">
+            <div class="card-header">
+              <h3 class="card-title">Land Assets</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addAssetModal">
+                  <i class="fas fa-plus"></i> Add Asset
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-box">
+                <input type="text" class="form-control" id="assetSearch" placeholder="Search by Asset Code or Location">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>Asset Code</th>
+                      <th>Location</th>
+                      <th>Size (ha)</th>
+                      <th>Owner</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="assetTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bills & Payments Section -->
+          <div class="card" id="bills">
+            <div class="card-header">
+              <h3 class="card-title">Bills & Payments</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addBillModal">
+                  <i class="fas fa-plus"></i> Add Bill
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-box">
+                <input type="text" class="form-control" id="billSearch" placeholder="Search by Bill ID or Asset Code">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>Bill ID</th>
+                      <th>Asset Code</th>
+                      <th>Type</th>
+                      <th>Amount ($)</th>
+                      <th>Due Date</th>
+                      <th>Status</th>
+                      <th>Payment Date</th>
+                      <th>Receipt</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reports Section -->
+          <div class="card" id="reports">
+            <div class="card-header">
+              <h3 class="card-title">Reports</h3>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#generateReportModal">
+                  <i class="fas fa-file-pdf"></i> Generate Report
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <p>Select a report type and generate a PDF report for transfers, proxies, or bills.</p>
+            </div>
+          </div>
+
+          <!-- Audit Log Section -->
+          <div class="card" id="audit">
+            <div class="card-header">
+              <h3 class="card-title">Audit Log</h3>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th>Action ID</th>
+                      <th>Action</th>
+                      <th>Record ID</th>
+                      <th>User</th>
+                      <th>IP Address</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Section -->
+          <div class="card" id="analytics">
+            <div class="card-header">
+              <h3 class="card-title">Analytics</h3>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-4">
+                  <h5>Transfer Types (2024-2025)</h5>
+                  <div class="chart-container">
+                    <canvas id="transferChart"></canvas>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <h5>Proxy Types (2024-2025)</h5>
+                  <div class="chart-container">
+                    <canvas id="proxyChart"></canvas>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <h5>Bill Status (2024-2025)</h5>
+                  <div class="chart-container">
+                    <canvas id="billChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Add Transfer Modal -->
+    <div class="modal fade" id="addTransferModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Add New Transfer</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="transferId" placeholder="Transfer ID">
+            <span class="error" id="transferIdError">Transfer ID must be unique</span>
+            <select class="form-control" id="assetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <input type="text" class="form-control" id="prevOwner" placeholder="Previous Owner">
+            <input type="text" class="form-control" id="newOwner" placeholder="New Owner">
+            <select class="form-control" id="transferType">
+              <option value="Sale">Sale</option>
+              <option value="Inheritance">Inheritance</option>
+              <option value="Exchange">Exchange</option>
+              <option value="Gift">Gift</option>
+            </select>
+            <input type="date" class="form-control" id="transferDate">
+            <span class="error" id="transferDateError">Date cannot be in the future</span>
+            <select class="form-control" id="transferStatus">
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="transferDocument" accept=".pdf">
+              <label class="custom-file-label" for="transferDocument">Choose PDF document</label>
+            </div>
+            <span class="error" id="transferDocumentError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addTransfer()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Transfer Modal -->
+    <div class="modal fade" id="editTransferModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Edit Transfer</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="editTransferId" readonly>
+            <select class="form-control" id="editAssetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <input type="text" class="form-control" id="editPrevOwner" placeholder="Previous Owner">
+            <input type="text" class="form-control" id="editNewOwner" placeholder="New Owner">
+            <select class="form-control" id="editTransferType">
+              <option value="Sale">Sale</option>
+              <option value="Inheritance">Inheritance</option>
+              <option value="Exchange">Exchange</option>
+              <option value="Gift">Gift</option>
+            </select>
+            <input type="date" class="form-control" id="editTransferDate">
+            <span class="error" id="editTransferDateError">Date cannot be in the future</span>
+            <select class="form-control" id="editTransferStatus">
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="editTransferDocument" accept=".pdf">
+              <label class="custom-file-label" for="editTransferDocument">Choose PDF document</label>
+            </div>
+            <span class="error" id="editTransferDocumentError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateTransfer()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Proxy Modal -->
+    <div class="modal fade" id="addProxyModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Add New Proxy</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="proxyId" placeholder="Proxy ID">
+            <span class="error" id="proxyIdError">Proxy ID must be unique</span>
+            <select class="form-control" id="proxyAssetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <input type="text" class="form-control" id="proxyOwner" placeholder="Owner">
+            <input type="text" class="form-control" id="proxyAgent" placeholder="Proxy Agent">
+            <select class="form-control" id="proxyType">
+              <option value="Temporary Admin">Temporary Admin</option>
+              <option value="Lease Admin">Lease Admin</option>
+              <option value="Tax Payment">Tax Payment</option>
+            </select>
+            <input type="text" class="form-control" id="proxyDuration" placeholder="Duration (e.g., 2025-01-01 to 2026-01-01)">
+            <select class="form-control" id="proxyStatus">
+              <option value="Active">Active</option>
+              <option value="Expired">Expired</option>
+              <option value="Terminated">Terminated</option>
+            </select>
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="proxyDocument" accept=".pdf">
+              <label class="custom-file-label" for="proxyDocument">Choose PDF document</label>
+            </div>
+            <span class="error" id="proxyDocumentError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addProxy()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Proxy Modal -->
+    <div class="modal fade" id="editProxyModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Edit Proxy</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="editProxyId" readonly>
+            <select class="form-control" id="editProxyAssetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <input type="text" class="form-control" id="editProxyOwner" placeholder="Owner">
+            <input type="text" class="form-control" id="editProxyAgent" placeholder="Proxy Agent">
+            <select class="form-control" id="editProxyType">
+              <option value="Temporary Admin">Temporary Admin</option>
+              <option value="Lease Admin">Lease Admin</option>
+              <option value="Tax Payment">Tax Payment</option>
+            </select>
+            <input type="text" class="form-control" id="editProxyDuration" placeholder="Duration (e.g., 2025-01-01 to 2026-01-01)">
+            <select class="form-control" id="editProxyStatus">
+              <option value="Active">Active</option>
+              <option value="Expired">Expired</option>
+              <option value="Terminated">Terminated</option>
+            </select>
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="editProxyDocument" accept=".pdf">
+              <label class="custom-file-label" for="editProxyDocument">Choose PDF document</label>
+            </div>
+            <span class="error" id="editProxyDocumentError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateProxy()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Add New User</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="userId" placeholder="User ID">
+            <span class="error" id="userIdError">User ID must be unique</span>
+            <input type="text" class="form-control" id="userName" placeholder="Name">
+            <select class="form-control" id="userRole">
+              <option value="Admin">Admin</option>
+              <option value="Agent">Agent</option>
+              <option value="Viewer">Viewer</option>
+            </select>
+            <input type="email" class="form-control" id="userEmail" placeholder="Email">
+            <span class="error" id="userEmailError">Invalid email format</span>
+            <select class="form-control" id="userStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addUser()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Edit User</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="editUserId" readonly>
+            <input type="text" class="form-control" id="editUserName" placeholder="Name">
+            <select class="form-control" id="editUserRole">
+              <option value="Admin">Admin</option>
+              <option value="Agent">Agent</option>
+              <option value="Viewer">Viewer</option>
+            </select>
+            <input type="email" class="form-control" id="editUserEmail" placeholder="Email">
+            <span class="error" id="editUserEmailError">Invalid email format</span>
+            <select class="form-control" id="editUserStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateUser()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Asset Modal -->
+    <div class="modal fade" id="addAssetModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Add New Asset</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="assetId" placeholder="Asset Code">
+            <span class="error" id="assetIdError">Asset Code must be unique</span>
+            <input type="text" class="form-control" id="assetLocation" placeholder="Location">
+            <input type="number" class="form-control" id="assetSize" placeholder="Size (hectares)" step="0.01">
+            <input type="text" class="form-control" id="assetOwner" placeholder="Owner">
+            <select class="form-control" id="assetStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addAsset()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Asset Modal -->
+    <div class="modal fade" id="editAssetModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Edit Asset</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="editAssetId" readonly>
+            <input type="text" class="form-control" id="editAssetLocation" placeholder="Location">
+            <input type="number" class="form-control" id="editAssetSize" placeholder="Size (hectares)" step="0.01">
+            <input type="text" class="form-control" id="editAssetOwner" placeholder="Owner">
+            <select class="form-control" id="editAssetStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateAsset()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Bill Modal -->
+    <div class="modal fade" id="addBillModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Add New Bill</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="billId" placeholder="Bill ID">
+            <span class="error" id="billIdError">Bill ID must be unique</span>
+            <select class="form-control" id="billAssetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <select class="form-control" id="billType">
+              <option value="Tax">Tax</option>
+              <option value="Lease Fee">Lease Fee</option>
+              <option value="Transfer Fee">Transfer Fee</option>
+            </select>
+            <input type="number" class="form-control" id="billAmount" placeholder="Amount ($)" step="0.01">
+            <span class="error" id="billAmountError">Amount must be positive</span>
+            <input type="date" class="form-control" id="billDueDate">
+            <span class="error" id="billDueDateError">Due date cannot be in the past</span>
+            <select class="form-control" id="billStatus">
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+            <input type="date" class="form-control" id="billPaymentDate" placeholder="Payment Date (optional)">
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="billReceipt" accept=".pdf">
+              <label class="custom-file-label" for="billReceipt">Choose PDF receipt</label>
+            </div>
+            <span class="error" id="billReceiptError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addBill()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Bill Modal -->
+    <div class="modal fade" id="editBillModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Edit Bill</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" id="editBillId" readonly>
+            <select class="form-control" id="editBillAssetCode">
+              <option value="">Select Asset Code</option>
+            </select>
+            <select class="form-control" id="editBillType">
+              <option value="Tax">Tax</option>
+              <option value="Lease Fee">Lease Fee</option>
+              <option value="Transfer Fee">Transfer Fee</option>
+            </select>
+            <input type="number" class="form-control" id="editBillAmount" placeholder="Amount ($)" step="0.01">
+            <span class="error" id="editBillAmountError">Amount must be positive</span>
+            <input type="date" class="form-control" id="editBillDueDate">
+            <span class="error" id="editBillDueDateError">Due date cannot be in the past</span>
+            <select class="form-control" id="editBillStatus">
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+            <input type="date" class="form-control" id="editBillPaymentDate" placeholder="Payment Date (optional)">
+            <div class="custom-file">
+              <input type="file" class="custom-file-input" id="editBillReceipt" accept=".pdf">
+              <label class="custom-file-label" for="editBillReceipt">Choose PDF receipt</label>
+            </div>
+            <span class="error" id="editBillReceiptError">Please upload a PDF file (max 2MB)</span>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateBill()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate Report Modal -->
+    <div class="modal fade" id="generateReportModal">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Generate Report</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <select class="form-control" id="reportType">
+              <option value="transfers">Transfer History</option>
+              <option value="proxies">Proxy Status</option>
+              <option value="bills">Bills & Payments</option>
+            </select>
+            <div class="report-preview mt-3" id="reportPreview"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="generateReport()">Generate PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SMS Notification Modal -->
+    <div class="modal fade" id="smsModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">SMS Notification</h4>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p id="smsMessage"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+      <strong>Land Management System © 2025</strong>
+      <div class="float-right d-none d-sm-inline-block">
+        <b>Version</b> 1.3.0
+      </div>
+    </footer>
+  </div>
+
+  <!-- Required JS -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- Custom JavaScript -->
+  <script>
+    // Sample data (unchanged)
+let transfers = [
+  { id: "TR001", assetCode: "AST001", prevOwner: "John Doe", newOwner: "Jane Smith", type: "Sale", date: "2025-01-10", status: "Approved", document: "transfer1.pdf" },
+  { id: "TR002", assetCode: "AST002", prevOwner: "Alice Brown", newOwner: "Bob Wilson", type: "Inheritance", date: "2025-02-15", status: "Pending", document: null }
+];
+
+let proxies = [
+  { id: "PR001", assetCode: "AST001", owner: "Jane Smith", agent: "Tom Clark", type: "Lease Admin", duration: "2025-01-01 to 2026-01-01", status: "Active", document: "proxy1.pdf" },
+  { id: "PR002", assetCode: "AST003", owner: "Mike Davis", agent: "Sara Lee", type: "Tax Payment", duration: "2025-03-01 to 2025-12-31", status: "Active", document: null }
+];
+
+let users = [
+  { id: "USR001", name: "Admin User", role: "Admin", email: "admin@landmgmt.com", status: "Active" },
+  { id: "USR002", name: "Agent Smith", role: "Agent", email: "agent@landmgmt.com", status: "Active" }
+];
+
+let assets = [
+  { id: "AST001", location: "Addis Ababa", size: 5.2, owner: "Jane Smith", status: "Active" },
+  { id: "AST002", location: "Bahir Dar", size: 3.8, owner: "Bob Wilson", status: "Active" },
+  { id: "AST003", location: "Hawassa", size: 4.5, owner: "Mike Davis", status: "Active" }
+];
+
+let bills = [
+  { id: "BIL001", assetCode: "AST001", type: "Tax", amount: 500.00, dueDate: "2025-06-01", status: "Pending", paymentDate: null, receipt: null },
+  { id: "BIL002", assetCode: "AST002", type: "Lease Fee", amount: 300.00, dueDate: "2025-03-01", status: "Paid", paymentDate: "2025-02-28", receipt: "receipt1.pdf" }
+];
+
+let auditLogs = [
+  { id: "AUD001", action: "Add Transfer", recordId: "TR001", user: "Admin User", ip: "192.168.1.1", timestamp: "2025-01-10 10:00:00" },
+  { id: "AUD002", action: "Add Proxy", recordId: "PR001", user: "Admin User", ip: "192.168.1.1", timestamp: "2025-01-11 12:00:00" }
+];
+
+// Populate asset dropdowns
+function populateAssetDropdowns() {
+  const dropdowns = [
+    document.getElementById('assetCode'),
+    document.getElementById('editAssetCode'),
+    document.getElementById('proxyAssetCode'),
+    document.getElementById('editProxyAssetCode'),
+    document.getElementById('billAssetCode'),
+    document.getElementById('editBillAssetCode')
+  ];
+  dropdowns.forEach(dropdown => {
+    dropdown.innerHTML = '<option value="">Select Asset Code</option>';
+    assets.forEach(asset => {
+      if (asset.status === 'Active') {
+        dropdown.innerHTML += `<option value="${asset.id}">${asset.id} (${asset.location})</option>`;
+      }
+    });
+  });
+}
+
+// Render tables (unchanged)
+function renderTransfers(data) {
+  const tbody = document.getElementById('transferTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.assetCode}</td>
+        <td>${item.prevOwner}</td>
+        <td>${item.newOwner}</td>
+        <td>${item.type}</td>
+        <td>${item.date}</td>
+        <td><span class="badge badge-${item.status === 'Approved' ? 'success' : item.status === 'Pending' ? 'warning' : 'danger'}">${item.status}</span></td>
+        <td>${item.document ? `<a href="#" onclick="viewDocument('${item.document}')">${item.document}</a>` : 'None'}</td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewTransfer('${item.id}')"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-warning btn-sm" onclick="editTransfer('${item.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTransfer('${item.id}')"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  });
+}
+
+function renderProxies(data) {
+  const tbody = document.getElementById('proxyTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.assetCode}</td>
+        <td>${item.owner}</td>
+        <td>${item.agent}</td>
+        <td>${item.type}</td>
+        <td>${item.duration}</td>
+        <td><span class="badge badge-${item.status === 'Active' ? 'success' : item.status === 'Expired' ? 'warning' : 'danger'}">${item.status}</span></td>
+        <td>${item.document ? `<a href="#" onclick="viewDocument('${item.document}')">${item.document}</a>` : 'None'}</td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewProxy('${item.id}')"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-warning btn-sm" onclick="editProxy('${item.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProxy('${item.id}')"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  });
+}
+
+function renderUsers(data) {
+  const tbody = document.getElementById('userTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.name}</td>
+        <td>${item.role}</td>
+        <td>${item.email}</td>
+        <td><span class="badge badge-${item.status === 'Active' ? 'success' : 'danger'}">${item.status}</span></td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewUser('${item.id}')"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-warning btn-sm" onclick="editUser('${item.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${item.id}')"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  });
+}
+
+function renderAssets(data) {
+  const tbody = document.getElementById('assetTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.location}</td>
+        <td>${item.size}</td>
+        <td>${item.owner}</td>
+        <td><span class="badge badge-${item.status === 'Active' ? 'success' : 'danger'}">${item.status}</span></td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewAsset('${item.id}')"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-warning btn-sm" onclick="editAsset('${item.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAsset('${item.id}')"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  });
+}
+
+function renderBills(data) {
+  const tbody = document.getElementById('billTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.assetCode}</td>
+        <td>${item.type}</td>
+        <td>${item.amount.toFixed(2)}</td>
+        <td>${item.dueDate}</td>
+        <td><span class="badge badge-${item.status === 'Paid' ? 'success' : item.status === 'Pending' ? 'warning' : 'danger'}">${item.status}</span></td>
+        <td>${item.paymentDate || 'N/A'}</td>
+        <td>${item.receipt ? `<a href="#" onclick="viewDocument('${item.receipt}')">${item.receipt}</a>` : 'None'}</td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="viewBill('${item.id}')"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-warning btn-sm" onclick="editBill('${item.id}')"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-success btn-sm ${item.status === 'Paid' ? 'disabled' : ''}" onclick="payBill('${item.id}')"><i class="fas fa-dollar-sign"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteBill('${item.id}')"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  });
+}
+
+function renderAuditLogs(data) {
+  const tbody = document.getElementById('auditTableBody');
+  tbody.innerHTML = '';
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.action}</td>
+        <td>${item.recordId}</td>
+        <td>${item.user}</td>
+        <td>${item.ip}</td>
+        <td>${item.timestamp}</td>
+      </tr>`;
+  });
+}
+
+// Render charts (unchanged)
+function renderCharts() {
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js is not loaded. Charts will not be rendered.');
+    return;
+  }
+
+  const transferTypes = transfers.reduce((acc, t) => {
+    acc[t.type] = (acc[t.type] || 0) + 1;
+    return acc;
+  }, {});
+  const transferChart = new Chart(document.getElementById('transferChart'), {
+    type: 'pie',
+    data: {
+      labels: Object.keys(transferTypes),
+      datasets: [{
+        label: 'Transfer Types',
+        data: Object.values(transferTypes),
+        backgroundColor: ['#36A2EB', '#FF6384', '#FFCE56', '#4BC0C0'],
+        borderColor: ['#ffffff'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: 'Transfer Types (2024-2025)' }
+      }
+    }
+  });
+
+  const proxyTypes = proxies.reduce((acc, p) => {
+    acc[p.type] = (acc[p.type] || 0) + 1;
+    return acc;
+  }, {});
+  const proxyChart = new Chart(document.getElementById('proxyChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(proxyTypes),
+      datasets: [{
+        label: 'Proxy Types',
+        data: Object.values(proxyTypes),
+        backgroundColor: ['#36A2EB', '#FF6384', '#FFCE56'],
+        borderColor: ['#ffffff'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: 'Proxy Types (2024-2025)' }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+        x: { title: { display: true, text: 'Type' } }
+      }
+    }
+  });
+
+  const billStatuses = bills.reduce((acc, b) => {
+    acc[b.status] = (acc[b.status] || 0) + 1;
+    return acc;
+  }, {});
+  const billChart = new Chart(document.getElementById('billChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(billStatuses),
+      datasets: [{
+        label: 'Bill Status',
+        data: Object.values(billStatuses),
+        backgroundColor: ['#36A2EB', '#FF6384', '#FFCE56'],
+        borderColor: ['#ffffff'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: 'Bill Status (2024-2025)' }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+        x: { title: { display: true, text: 'Status' } }
+      }
+    }
+  });
+}
+
+// Validate file (unchanged)
+function validateFile(file) {
+  if (!file) return true; // File is optional
+  const maxSize = 2 * 1024 * 1024; // 2MB
+  return file.type === 'application/pdf' && file.size <= maxSize;
+}
+
+// Validate email (unchanged)
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+// Add audit log (unchanged)
+function addAuditLog(action, recordId) {
+  const audit = {
+    id: `AUD${(auditLogs.length + 1).toString().padStart(3, '0')}`,
+    action,
+    recordId,
+    user: 'Admin User', // Simulated
+    ip: '192.168.1.' + Math.floor(Math.random() * 255), // Simulated
+    timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
+  };
+  auditLogs.push(audit);
+  renderAuditLogs(auditLogs);
+}
+
+// Show SMS notification (unchanged)
+function showSMSNotification(message) {
+  document.getElementById('smsMessage').textContent = message;
+  $('#smsModal').modal('show');
+}
+
+// Generate report (unchanged)
+function generateReport() {
+  const reportType = document.getElementById('reportType').value;
+  let latexContent = `
+\\documentclass{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage{booktabs}
+\\usepackage{geometry}
+\\geometry{a4paper, margin=1in}
+\\title{Land Management Report - ${reportType === 'transfers' ? 'Transfer History' : reportType === 'proxies' ? 'Proxy Status' : 'Bills & Payments'}}
+\\author{Land Management System}
+\\date{\\today}
+\\begin{document}
+\\maketitle
+\\section{${reportType === 'transfers' ? 'Transfer History' : reportType === 'proxies' ? 'Proxy Status' : 'Bills & Payments'}}
+\\begin{tabular}{${reportType === 'transfers' ? 'llclllcl' : reportType === 'proxies' ? 'llcllclcl' : 'llcllclcl'}}
+\\toprule
+${reportType === 'transfers' ? 'ID & Asset Code & Prev Owner & New Owner & Type & Date & Status & Document \\\\' : reportType === 'proxies' ? 'ID & Asset Code & Owner & Agent & Type & Duration & Status & Document \\\\' : 'ID & Asset Code & Type & Amount & Due Date & Status & Payment Date & Receipt \\\\'}
+\\midrule
+`;
+
+  const data = reportType === 'transfers' ? transfers : reportType === 'proxies' ? proxies : bills;
+  data.forEach(item => {
+    if (reportType === 'transfers') {
+      latexContent += `${item.id} & ${item.assetCode} & ${item.prevOwner} & ${item.newOwner} & ${item.type} & ${item.date} & ${item.status} & ${item.document || 'None'} \\\\ \n`;
+    } else if (reportType === 'proxies') {
+      latexContent += `${item.id} & ${item.assetCode} & ${item.owner} & ${item.agent} & ${item.type} & ${item.duration} & ${item.status} & ${item.document || 'None'} \\\\ \n`;
+    } else {
+      latexContent += `${item.id} & ${item.assetCode} & ${item.type} & \\$${item.amount.toFixed(2)} & ${item.dueDate} & ${item.status} & ${item.paymentDate || 'N/A'} & ${item.receipt || 'None'} \\\\ \n`;
+    }
+  });
+
+  latexContent += `
+\\bottomrule
+\\end{tabular}
+\\end{document}
+`;
+
+  document.getElementById('reportPreview').textContent = latexContent;
+  alert('Report generated (simulated). In a real system, this LaTeX would be compiled to PDF using latexmk.');
+}
+
+// NEW: Clear form functions
+function clearTransferForm() {
+  document.getElementById('transferId').value = '';
+  document.getElementById('assetCode').value = '';
+  document.getElementById('prevOwner').value = '';
+  document.getElementById('newOwner').value = '';
+  document.getElementById('transferType').value = 'Sale';
+  document.getElementById('transferDate').value = '';
+  document.getElementById('transferStatus').value = 'Pending';
+  document.getElementById('transferDocument').value = '';
+  document.querySelector('#transferDocument + .custom-file-label').textContent = 'Choose PDF document';
+  document.getElementById('transferIdError').style.display = 'none';
+  document.getElementById('transferDateError').style.display = 'none';
+  document.getElementById('transferDocumentError').style.display = 'none';
+}
+
+function clearProxyForm() {
+  document.getElementById('proxyId').value = '';
+  document.getElementById('proxyAssetCode').value = '';
+  document.getElementById('proxyOwner').value = '';
+  document.getElementById('proxyAgent').value = '';
+  document.getElementById('proxyType').value = 'Temporary Admin';
+  document.getElementById('proxyDuration').value = '';
+  document.getElementById('proxyStatus').value = 'Active';
+  document.getElementById('proxyDocument').value = '';
+  document.querySelector('#proxyDocument + .custom-file-label').textContent = 'Choose PDF document';
+  document.getElementById('proxyIdError').style.display = 'none';
+  document.getElementById('proxyDocumentError').style.display = 'none';
+}
+
+function clearUserForm() {
+  document.getElementById('userId').value = '';
+  document.getElementById('userName').value = '';
+  document.getElementById('userRole').value = 'Admin';
+  document.getElementById('userEmail').value = '';
+  document.getElementById('userStatus').value = 'Active';
+  document.getElementById('userIdError').style.display = 'none';
+  document.getElementById('userEmailError').style.display = 'none';
+}
+
+function clearAssetForm() {
+  document.getElementById('assetId').value = '';
+  document.getElementById('assetLocation').value = '';
+  document.getElementById('assetSize').value = '';
+  document.getElementById('assetOwner').value = '';
+  document.getElementById('assetStatus').value = 'Active';
+  document.getElementById('assetIdError').style.display = 'none';
+}
+
+function clearBillForm() {
+  document.getElementById('billId').value = '';
+  document.getElementById('billAssetCode').value = '';
+  document.getElementById('billType').value = 'Tax';
+  document.getElementById('billAmount').value = '';
+  document.getElementById('billDueDate').value = '';
+  document.getElementById('billStatus').value = 'Pending';
+  document.getElementById('billPaymentDate').value = '';
+  document.getElementById('billReceipt').value = '';
+  document.querySelector('#billReceipt + .custom-file-label').textContent = 'Choose PDF receipt';
+  document.getElementById('billIdError').style.display = 'none';
+  document.getElementById('billAmountError').style.display = 'none';
+  document.getElementById('billDueDateError').style.display = 'none';
+  document.getElementById('billReceiptError').style.display = 'none';
+}
+
+// NEW: View functions
+function viewTransfer(id) {
+  const transfer = transfers.find(t => t.id === id);
+  if (transfer) {
+    const details = `
+      <strong>ID:</strong> ${transfer.id}<br>
+      <strong>Asset Code:</strong> ${transfer.assetCode}<br>
+      <strong>Previous Owner:</strong> ${transfer.prevOwner}<br>
+      <strong>New Owner:</strong> ${transfer.newOwner}<br>
+      <strong>Type:</strong> ${transfer.type}<br>
+      <strong>Date:</strong> ${transfer.date}<br>
+      <strong>Status:</strong> ${transfer.status}<br>
+      <strong>Document:</strong> ${transfer.document ? `<a href="#" onclick="viewDocument('${transfer.document}')">${transfer.document}</a>` : 'None'}
+    `;
+    showSMSNotification(details); // Using SMS modal for simplicity
+  }
+}
+
+function viewProxy(id) {
+  const proxy = proxies.find(p => p.id === id);
+  if (proxy) {
+    const details = `
+      <strong>ID:</strong> ${proxy.id}<br>
+      <strong>Asset Code:</strong> ${proxy.assetCode}<br>
+      <strong>Owner:</strong> ${proxy.owner}<br>
+      <strong>Agent:</strong> ${proxy.agent}<br>
+      <strong>Type:</strong> ${proxy.type}<br>
+      <strong>Duration:</strong> ${proxy.duration}<br>
+      <strong>Status:</strong> ${proxy.status}<br>
+      <strong>Document:</strong> ${proxy.document ? `<a href="#" onclick="viewDocument('${proxy.document}')">${proxy.document}</a>` : 'None'}
+    `;
+    showSMSNotification(details);
+  }
+}
+
+function viewUser(id) {
+  const user = users.find(u => u.id === id);
+  if (user) {
+    const details = `
+      <strong>ID:</strong> ${user.id}<br>
+      <strong>Name:</strong> ${user.name}<br>
+      <strong>Role:</strong> ${user.role}<br>
+      <strong>Email:</strong> ${user.email}<br>
+      <strong>Status:</strong> ${user.status}
+    `;
+    showSMSNotification(details);
+  }
+}
+
+function viewAsset(id) {
+  const asset = assets.find(a => a.id === id);
+  if (asset) {
+    const details = `
+      <strong>Asset Code:</strong> ${asset.id}<br>
+      <strong>Location:</strong> ${asset.location}<br>
+      <strong>Size (ha):</strong> ${asset.size}<br>
+      <strong>Owner:</strong> ${asset.owner}<br>
+      <strong>Status:</strong> ${asset.status}
+    `;
+    showSMSNotification(details);
+  }
+}
+
+function viewBill(id) {
+  const bill = bills.find(b => b.id === id);
+  if (bill) {
+    const details = `
+      <strong>ID:</strong> ${bill.id}<br>
+      <strong>Asset Code:</strong> ${bill.assetCode}<br>
+      <strong>Type:</strong> ${bill.type}<br>
+      <strong>Amount:</strong> $${bill.amount.toFixed(2)}<br>
+      <strong>Due Date:</strong> ${bill.dueDate}<br>
+      <strong>Status:</strong> ${bill.status}<br>
+      <strong>Payment Date:</strong> ${bill.paymentDate || 'N/A'}<br>
+      <strong>Receipt:</strong> ${bill.receipt ? `<a href="#" onclick="viewDocument('${bill.receipt}')">${bill.receipt}</a>` : 'None'}
+    `;
+    showSMSNotification(details);
+  }
+}
+
+// NEW: Delete functions
+function deleteTransfer(id) {
+  if (confirm(`Are you sure you want to delete transfer ${id}?`)) {
+    transfers = transfers.filter(t => t.id !== id);
+    renderTransfers(transfers);
+    renderCharts();
+    addAuditLog('Delete Transfer', id);
+    showSMSNotification(`Transfer ${id} deleted.`);
+  }
+}
+
+function deleteProxy(id) {
+  if (confirm(`Are you sure you want to delete proxy ${id}?`)) {
+    proxies = proxies.filter(p => p.id !== id);
+    renderProxies(proxies);
+    renderCharts();
+    addAuditLog('Delete Proxy', id);
+    showSMSNotification(`Proxy ${id} deleted.`);
+  }
+}
+
+function deleteUser(id) {
+  if (confirm(`Are you sure you want to delete user ${id}?`)) {
+    users = users.filter(u => u.id !== id);
+    renderUsers(users);
+    addAuditLog('Delete User', id);
+    showSMSNotification(`User ${id} deleted.`);
+  }
+}
+
+function deleteAsset(id) {
+  if (confirm(`Are you sure you want to delete asset ${id}?`)) {
+    assets = assets.filter(a => a.id !== id);
+    renderAssets(assets);
+    populateAssetDropdowns();
+    addAuditLog('Delete Asset', id);
+    showSMSNotification(`Asset ${id} deleted.`);
+  }
+}
+
+function deleteBill(id) {
+  if (confirm(`Are you sure you want to delete bill ${id}?`)) {
+    bills = bills.filter(b => b.id !== id);
+    renderBills(bills);
+    renderCharts();
+    addAuditLog('Delete Bill', id);
+    showSMSNotification(`Bill ${id} deleted.`);
+  }
+}
+
+// NEW: Document viewing (simulated)
+function viewDocument(filename) {
+  showSMSNotification(`Simulated viewing of document: ${filename}. In a real system, this would open the PDF in a new tab or viewer.`);
+}
+
+// NEW: Pay bill
+function payBill(id) {
+  const bill = bills.find(b => b.id === id);
+  if (bill && bill.status !== 'Paid') {
+    const today = new Date().toISOString().split('T')[0];
+    bill.status = 'Paid';
+    bill.paymentDate = today;
+    // Simulate receipt upload (optional)
+    bill.receipt = bill.receipt || `receipt_${id}.pdf`;
+    renderBills(bills);
+    renderCharts();
+    addAuditLog('Pay Bill', id);
+    const asset = assets.find(a => a.id === bill.assetCode);
+    showSMSNotification(`Bill ${id} marked as Paid on ${today}. Notification sent to ${asset.owner}.`);
+  }
+}
+
+// Add new transfer (unchanged)
+function addTransfer() {
+  const transfer = {
+    id: document.getElementById('transferId').value.trim(),
+    assetCode: document.getElementById('assetCode').value,
+    prevOwner: document.getElementById('prevOwner').value.trim(),
+    newOwner: document.getElementById('newOwner').value.trim(),
+    type: document.getElementById('transferType').value,
+    date: document.getElementById('transferDate').value,
+    status: document.getElementById('transferStatus').value,
+    document: null
+  };
+  const file = document.getElementById('transferDocument').files[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('transferIdError').style.display = 'none';
+  document.getElementById('transferDateError').style.display = 'none';
+  document.getElementById('transferDocumentError').style.display = 'none';
+
+  if (transfers.some(t => t.id === transfer.id)) {
+    document.getElementById('transferIdError').style.display = 'block';
+    valid = false;
+  }
+  if (!transfer.id || !transfer.assetCode || !transfer.prevOwner || !transfer.newOwner || !transfer.date) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (transfer.date > today) {
+    document.getElementById('transferDateError').style.display = 'block';
+    valid = false;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('transferDocumentError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    if (file) transfer.document = file.name;
+    transfers.push(transfer);
+    renderTransfers(transfers);
+    renderCharts();
+    addAuditLog('Add Transfer', transfer.id);
+    showSMSNotification(`Transfer ${transfer.id} (${transfer.status}) notification sent to ${transfer.newOwner}.`);
+    $('#addTransferModal').modal('hide');
+    clearTransferForm();
+    alert('Transfer added successfully!');
+  }
+}
+
+// Add new proxy (unchanged)
+function addProxy() {
+  const proxy = {
+    id: document.getElementById('proxyId').value.trim(),
+    assetCode: document.getElementById('proxyAssetCode').value,
+    owner: document.getElementById('proxyOwner').value.trim(),
+    agent: document.getElementById('proxyAgent').value.trim(),
+    type: document.getElementById('proxyType').value,
+    duration: document.getElementById('proxyDuration').value.trim(),
+    status: document.getElementById('proxyStatus').value,
+    document: null
+  };
+  const file = document.getElementById('proxyDocument').files[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('proxyIdError').style.display = 'none';
+  document.getElementById('proxyDocumentError').style.display = 'none';
+
+  if (proxies.some(p => p.id === proxy.id)) {
+    document.getElementById('proxyIdError').style.display = 'block';
+    valid = false;
+  }
+  if (!proxy.id || !proxy.assetCode || !proxy.owner || !proxy.agent || !proxy.duration) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('proxyDocumentError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    if (file) proxy.document = file.name;
+    proxies.push(proxy);
+    renderProxies(proxies);
+    renderCharts();
+    addAuditLog('Add Proxy', proxy.id);
+    showSMSNotification(`Proxy ${proxy.id} (${proxy.status}) notification sent to ${proxy.owner}.`);
+    $('#addProxyModal').modal('hide');
+    clearProxyForm();
+    alert('Proxy added successfully!');
+  }
+}
+
+// Add new user (unchanged)
+function addUser() {
+  const user = {
+    id: document.getElementById('userId').value.trim(),
+    name: document.getElementById('userName').value.trim(),
+    role: document.getElementById('userRole').value,
+    email: document.getElementById('userEmail').value.trim(),
+    status: document.getElementById('userStatus').value
+  };
+
+  // Validation
+  let valid = true;
+  document.getElementById('userIdError').style.display = 'none';
+  document.getElementById('userEmailError').style.display = 'none';
+
+  if (users.some(u => u.id === user.id)) {
+    document.getElementById('userIdError').style.display = 'block';
+    valid = false;
+  }
+  if (!user.id || !user.name || !user.email) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (!validateEmail(user.email)) {
+    document.getElementById('userEmailError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    users.push(user);
+    renderUsers(users);
+    addAuditLog('Add User', user.id);
+    showSMSNotification(`User ${user.id} (${user.status}) added. Notification sent to ${user.email}.`);
+    $('#addUserModal').modal('hide');
+    clearUserForm();
+    alert('User added successfully!');
+  }
+}
+
+// Add new asset (unchanged)
+function addAsset() {
+  const asset = {
+    id: document.getElementById('assetId').value.trim(),
+    location: document.getElementById('assetLocation').value.trim(),
+    size: parseFloat(document.getElementById('assetSize').value),
+    owner: document.getElementById('assetOwner').value.trim(),
+    status: document.getElementById('assetStatus').value
+  };
+
+  // Validation
+  let valid = true;
+  document.getElementById('assetIdError').style.display = 'none';
+
+  if (assets.some(a => a.id === asset.id)) {
+    document.getElementById('assetIdError').style.display = 'block';
+    valid = false;
+  }
+  if (!asset.id || !asset.location || !asset.size || !asset.owner) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (asset.size <= 0) {
+    alert('Size must be greater than 0.');
+    return;
+  }
+
+  if (valid) {
+    assets.push(asset);
+    renderAssets(assets);
+    populateAssetDropdowns();
+    addAuditLog('Add Asset', asset.id);
+    showSMSNotification(`Asset ${asset.id} (${asset.status}) added. Notification sent to ${asset.owner}.`);
+    $('#addAssetModal').modal('hide');
+    clearAssetForm();
+    alert('Asset added successfully!');
+  }
+}
+
+// Add new bill (unchanged)
+function addBill() {
+  const bill = {
+    id: document.getElementById('billId').value.trim(),
+    assetCode: document.getElementById('billAssetCode').value,
+    type: document.getElementById('billType').value,
+    amount: parseFloat(document.getElementById('billAmount').value),
+    dueDate: document.getElementById('billDueDate').value,
+    status: document.getElementById('billStatus').value,
+    paymentDate: document.getElementById('billPaymentDate').value || null,
+    receipt: null
+  };
+  const file = document.getElementById('billReceipt').files[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('billIdError').style.display = 'none';
+  document.getElementById('billAmountError').style.display = 'none';
+  document.getElementById('billDueDateError').style.display = 'none';
+  document.getElementById('billReceiptError').style.display = 'none';
+
+  if (bills.some(b => b.id === bill.id)) {
+    document.getElementById('billIdError').style.display = 'block';
+    valid = false;
+  }
+  if (!bill.id || !bill.assetCode || !bill.amount || !bill.dueDate) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (bill.amount <= 0) {
+    document.getElementById('billAmountError').style.display = 'block';
+    valid = false;
+  }
+  if (bill.dueDate < today && bill.status !== 'Paid' && bill.status !== 'Overdue') {
+    document.getElementById('billDueDateError').style.display = 'block';
+    valid = false;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('billReceiptError').style.display = 'block';
+    valid = false;
+  }
+  if (bill.status === 'Paid' && !bill.paymentDate) {
+    alert('Payment date is required for Paid status.');
+    return;
+  }
+
+  if (valid) {
+    if (file) bill.receipt = file.name;
+    bills.push(bill);
+    renderBills(bills);
+    renderCharts();
+    addAuditLog('Add Bill', bill.id);
+    const asset = assets.find(a => a.id === bill.assetCode);
+    showSMSNotification(`Bill ${bill.id} (${bill.status}) notification sent to ${asset.owner}.`);
+    $('#addBillModal').modal('hide');
+    clearBillForm();
+    alert('Bill added successfully!');
+  }
+}
+
+// Edit transfer (unchanged)
+function editTransfer(id) {
+  const transfer = transfers.find(t => t.id === id);
+  document.getElementById('editTransferId').value = transfer.id;
+  document.getElementById('editAssetCode').value = transfer.assetCode;
+  document.getElementById('editPrevOwner').value = transfer.prevOwner;
+  document.getElementById('editNewOwner').value = transfer.newOwner;
+  document.getElementById('editTransferType').value = transfer.type;
+  document.getElementById('editTransferDate').value = transfer.date;
+  document.getElementById('editTransferStatus').value = transfer.status;
+  $('#editTransferModal').modal('show');
+}
+
+function updateTransfer() {
+  const transfer = {
+    id: document.getElementById('editTransferId').value,
+    assetCode: document.getElementById('editAssetCode').value,
+    prevOwner: document.getElementById('editPrevOwner').value.trim(),
+    newOwner: document.getElementById('editNewOwner').value.trim(),
+    type: document.getElementById('editTransferType').value,
+    date: document.getElementById('editTransferDate').value,
+    status: document.getElementById('editTransferStatus').value,
+    document: transfers.find(t => t.id === document.getElementById('editTransferId').value).document
+  };
+  const file = document.getElementById('editTransferDocument').files[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('editTransferDateError').style.display = 'none';
+  document.getElementById('editTransferDocumentError').style.display = 'none';
+
+  if (!transfer.assetCode || !transfer.prevOwner || !transfer.newOwner || !transfer.date) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (transfer.date > today) {
+    document.getElementById('editTransferDateError').style.display = 'block';
+    valid = false;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('editTransferDocumentError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    if (file) transfer.document = file.name;
+    transfers = transfers.map(t => t.id === transfer.id ? transfer : t);
+    renderTransfers(transfers);
+    renderCharts();
+    addAuditLog('Edit Transfer', transfer.id);
+    showSMSNotification(`Transfer ${transfer.id} updated to ${transfer.status} for ${transfer.newOwner}.`);
+    $('#editTransferModal').modal('hide');
+    alert('Transfer updated successfully!');
+  }
+}
+
+// Edit proxy (unchanged)
+function editProxy(id) {
+  const proxy = proxies.find(p => p.id === id);
+  document.getElementById('editProxyId').value = proxy.id;
+  document.getElementById('editProxyAssetCode').value = proxy.assetCode;
+  document.getElementById('editProxyOwner').value = proxy.owner;
+  document.getElementById('editProxyAgent').value = proxy.agent;
+  document.getElementById('editProxyType').value = proxy.type;
+  document.getElementById('editProxyDuration').value = proxy.duration;
+  document.getElementById('editProxyStatus').value = proxy.status;
+  $('#editProxyModal').modal('show');
+}
+
+function updateProxy() {
+  const proxy = {
+    id: document.getElementById('editProxyId').value,
+    assetCode: document.getElementById('editProxyAssetCode').value,
+    owner: document.getElementById('editProxyOwner').value.trim(),
+    agent: document.getElementById('editProxyAgent').value.trim(),
+    type: document.getElementById('editProxyType').value,
+    duration: document.getElementById('editProxyDuration').value.trim(),
+    status: document.getElementById('editProxyStatus').value,
+    document: proxies.find(p => p.id === document.getElementById('editProxyId').value).document
+  };
+  const file = document.getElementById('editProxyDocument').files[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('editProxyDocumentError').style.display = 'none';
+
+  if (!proxy.assetCode || !proxy.owner || !proxy.agent || !proxy.duration) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('editProxyDocumentError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    if (file) proxy.document = file.name;
+    proxies = proxies.map(p => p.id === proxy.id ? proxy : p);
+    renderProxies(proxies);
+    renderCharts();
+    addAuditLog('Edit Proxy', proxy.id);
+    showSMSNotification(`Proxy ${proxy.id} updated to ${proxy.status} for ${proxy.owner}.`);
+    $('#editProxyModal').modal('hide');
+    alert('Proxy updated successfully!');
+  }
+}
+
+// Edit user (unchanged)
+function editUser(id) {
+  const user = users.find(u => u.id === id);
+  document.getElementById('editUserId').value = user.id;
+  document.getElementById('editUserName').value = user.name;
+  document.getElementById('editUserRole').value = user.role;
+  document.getElementById('editUserEmail').value = user.email;
+  document.getElementById('editUserStatus').value = user.status;
+  $('#editUserModal').modal('show');
+}
+
+function updateUser() {
+  const user = {
+    id: document.getElementById('editUserId').value,
+    name: document.getElementById('editUserName').value.trim(),
+    role: document.getElementById('editUserRole').value,
+    email: document.getElementById('editUserEmail').value.trim(),
+    status: document.getElementById('editUserStatus').value
+  };
+
+  // Validation
+  let valid = true;
+  document.getElementById('editUserEmailError').style.display = 'none';
+
+  if (!user.name || !user.email) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (!validateEmail(user.email)) {
+    document.getElementById('editUserEmailError').style.display = 'block';
+    valid = false;
+  }
+
+  if (valid) {
+    users = users.map(u => u.id === user.id ? user : u);
+    renderUsers(users);
+    addAuditLog('Edit User', user.id);
+    showSMSNotification(`User ${user.id} updated to ${user.status}. Notification sent to ${user.email}.`);
+    $('#editUserModal').modal('hide');
+    alert('User updated successfully!');
+  }
+}
+
+// NEW: Edit asset
+function editAsset(id) {
+  const asset = assets.find(a => a.id === id);
+  document.getElementById('editAssetId').value = asset.id;
+  document.getElementById('editAssetLocation').value = asset.location;
+  document.getElementById('editAssetSize').value = asset.size;
+  document.getElementById('editAssetOwner').value = asset.owner;
+  document.getElementById('editAssetStatus').value = asset.status;
+  $('#editAssetModal').modal('show');
+}
+
+function updateAsset() {
+  const asset = {
+    id: document.getElementById('editAssetId').value,
+    location: document.getElementById('editAssetLocation').value.trim(),
+    size: parseFloat(document.getElementById('editAssetSize').value),
+    owner: document.getElementById('editAssetOwner').value.trim(),
+    status: document.getElementById('editAssetStatus').value
+  };
+
+  // Validation
+  if (!asset.location || !asset.size || !asset.owner) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (asset.size <= 0) {
+    alert('Size must be greater than 0.');
+    return;
+  }
+
+  assets = assets.map(a => a.id === asset.id ? asset : a);
+  renderAssets(assets);
+  populateAssetDropdowns();
+  addAuditLog('Edit Asset', asset.id);
+  showSMSNotification(`Asset ${asset.id} updated to ${asset.status}. Notification sent to ${asset.owner}.`);
+  $('#editAssetModal').modal('hide');
+  alert('Asset updated successfully!');
+}
+
+// NEW: Edit bill
+function editBill(id) {
+  const bill = bills.find(b => b.id === id);
+  document.getElementById('editBillId').value = bill.id;
+  document.getElementById('editBillAssetCode').value = bill.assetCode;
+  document.getElementById('editBillType').value = bill.type;
+  document.getElementById('editBillAmount').value = bill.amount;
+  document.getElementById('editBillDueDate').value = bill.dueDate;
+  document.getElementById('editBillStatus').value = bill.status;
+  document.getElementById('editBillPaymentDate').value = bill.paymentDate || '';
+  $('#editBillModal').modal('show');
+}
+
+function updateBill() {
+  const bill = {
+    id: document.getElementById('editBillId').value,
+    assetCode: document.getElementById('editBillAssetCode').value,
+    type: document.getElementById('editBillType').value,
+    amount: parseFloat(document.getElementById('editBillAmount').value),
+    dueDate: document.getElementById('editBillDueDate').value,
+    status: document.getElementById('editBillStatus').value,
+    paymentDate: document.getElementById('editBillPaymentDate').value || null,
+    receipt: bills.find(b => b.id === document.getElementById('editBillId').value).receipt
+  };
+  const file = document.getElementById('editBillReceipt').files[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Validation
+  let valid = true;
+  document.getElementById('editBillAmountError').style.display = 'none';
+  document.getElementById('editBillDueDateError').style.display = 'none';
+  document.getElementById('editBillReceiptError').style.display = 'none';
+
+  if (!bill.assetCode || !bill.amount || !bill.dueDate) {
+    alert('Please fill all required fields.');
+    return;
+  }
+  if (bill.amount <= 0) {
+    document.getElementById('editBillAmountError').style.display = 'block';
+    valid = false;
+  }
+  if (bill.dueDate < today && bill.status !== 'Paid' && bill.status !== 'Overdue') {
+    document.getElementById('editBillDueDateError').style.display = 'block';
+    valid = false;
+  }
+  if (file && !validateFile(file)) {
+    document.getElementById('editBillReceiptError').style.display = 'block';
+    valid = false;
+  }
+  if (bill.status === 'Paid' && !bill.paymentDate) {
+    alert('Payment date is required for Paid status.');
+    return;
+  }
+
+  if (valid) {
+    if (file) bill.receipt = file.name;
+    bills = bills.map(b => b.id === bill.id ? bill : b);
+    renderBills(bills);
+    renderCharts();
+    addAuditLog('Edit Bill', bill.id);
+    const asset = assets.find(a => a.id === bill.assetCode);
+    showSMSNotification(`Bill ${bill.id} updated to ${bill.status}. Notification sent to ${asset.owner}.`);
+    $('#editBillModal').modal('hide');
+    alert('Bill updated successfully!');
+  }
+}
+
+// NEW: Search functionality
+function setupSearch() {
+  // Transfers
+  document.getElementById('transferSearch').addEventListener('input', function (e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = transfers.filter(
+      t => t.id.toLowerCase().includes(query) || 
+           t.prevOwner.toLowerCase().includes(query) || 
+           t.newOwner.toLowerCase().includes(query)
+    );
+    renderTransfers(filtered);
+  });
+
+  // Proxies
+  document.getElementById('proxySearch').addEventListener('input', function (e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = proxies.filter(
+      p => p.id.toLowerCase().includes(query) || 
+           p.owner.toLowerCase().includes(query) || 
+           p.agent.toLowerCase().includes(query)
+    );
+    renderProxies(filtered);
+  });
+
+  // Users
+  document.getElementById('userSearch').addEventListener('input', function (e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = users.filter(
+      u => u.id.toLowerCase().includes(query) || 
+           u.name.toLowerCase().includes(query)
+    );
+    renderUsers(filtered);
+  });
+
+  // Assets
+  document.getElementById('assetSearch').addEventListener('input', function (e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = assets.filter(
+      a => a.id.toLowerCase().includes(query) || 
+           a.location.toLowerCase().includes(query)
+    );
+    renderAssets(filtered);
+  });
+
+  // Bills
+  document.getElementById('billSearch').addEventListener('input', function (e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = bills.filter(
+      b => b.id.toLowerCase().includes(query) || 
+           b.assetCode.toLowerCase().includes(query)
+    );
+    renderBills(filtered);
+  });
+}
+
+// Initialize
+$(document).ready(function () {
+  populateAssetDropdowns();
+  renderTransfers(transfers);
+  renderProxies(proxies);
+  renderUsers(users);
+  renderAssets(assets);
+  renderBills(bills);
+  renderAuditLogs(auditLogs);
+  renderCharts();
+  setupSearch(); // Initialize search functionality
+});
+</script>
