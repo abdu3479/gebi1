@@ -2,6 +2,16 @@
 require_once '../config/database.php';
 require_once 'includes/helpers.php';
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Generate CSRF token if not set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Ensure user is authenticated and has required role
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
@@ -50,7 +60,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0) {
         $editRoom = $result->fetch_assoc();
         $stmt->close();
         if (!$editRoom) {
-            $_SESSION['error_messages'][] = translate("Room not found.");
+            $_SESSION['error_messages'][] = translate('room_not_found');
             redirect('rooms.php');
         }
     } catch (Exception $e) {
@@ -103,6 +113,9 @@ $pageTitle = translate('rooms');
         }
         body, input, select, textarea, .datatable {
             font-family: 'Noto Sans Ethiopic', 'Source Sans Pro', sans-serif;
+        }
+        .modal-lg {
+            max-width: 800px;
         }
     </style>
 </head>
@@ -296,111 +309,18 @@ $pageTitle = translate('rooms');
                 <?php displayMessages(); ?>
                 
                 <div class="row">
-                    <!-- Room Form -->
-                    <div class="col-md-4">
-                        <div class="card card-primary">
-                            <div class="card-header">
-                                <h3 class="card-title"><?php echo isset($_GET['edit']) ? translate('edit_room') : translate('add_new_room'); ?></h3>
-                            </div>
-                            <form method="post" action="process_room.php" id="roomForm">
-                                <?php if (isset($_GET['edit'])): ?>
-                                    <input type="hidden" name="edit_id" value="<?php echo (int)$_GET['edit']; ?>">
-                                <?php endif; ?>
-                                <div class="card-body">
-                                    <div class="form-group">
-                                        <label for="building_id"><?php echo translate('building'); ?>*</label>
-                                        <select class="form-control select2" id="building_id" name="building_id" required>
-                                            <option value=""><?php echo translate('select_building'); ?></option>
-                                            <?php
-                                            try {
-                                                $stmt = $conn->prepare("SELECT b.building_id, b.building_name, p.property_name 
-                                                                       FROM buildings b
-                                                                       JOIN properties p ON b.property_id = p.property_id
-                                                                       ORDER BY p.property_name, b.building_name");
-                                                $stmt->execute();
-                                                $result = $stmt->get_result();
-                                                while ($row = $result->fetch_assoc()):
-                                                    $selected = (isset($editRoom['building_id']) && $editRoom['building_id'] == $row['building_id']) ? 'selected' : '';
-                                            ?>
-                                                <option value="<?php echo (int)$row['building_id']; ?>" <?php echo $selected; ?>>
-                                                    <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?>
-                                                </option>
-                                            <?php endwhile; 
-                                                $stmt->close();
-                                            } catch (Exception $e) {
-                                                $_SESSION['error_messages'][] = "Error fetching buildings: " . sanitize($e->getMessage());
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="type_id"><?php echo translate('room_type'); ?>*</label>
-                                        <select class="form-control select2" id="type_id" name="type_id" required>
-                                            <option value=""><?php echo translate('select_type'); ?></option>
-                                            <?php
-                                            try {
-                                                $stmt = $conn->prepare("SELECT type_id, type_name FROM room_types ORDER BY type_name");
-                                                $stmt->execute();
-                                                $result = $stmt->get_result();
-                                                while ($row = $result->fetch_assoc()):
-                                                    $selected = (isset($editRoom['type_id']) && $editRoom['type_id'] == $row['type_id']) ? 'selected' : '';
-                                            ?>
-                                                <option value="<?php echo (int)$row['type_id']; ?>" <?php echo $selected; ?>>
-                                                    <?php echo sanitize($row['type_name']); ?>
-                                                </option>
-                                            <?php endwhile; 
-                                                $stmt->close();
-                                            } catch (Exception $e) {
-                                                $_SESSION['error_messages'][] = "Error fetching room types: " . sanitize($e->getMessage());
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="room_number"><?php echo translate('room_number'); ?>*</label>
-                                        <input type="text" class="form-control" id="room_number" name="room_number" required maxlength="50"
-                                               value="<?php echo isset($editRoom['room_number']) ? sanitize($editRoom['room_number']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="floor_number"><?php echo translate('floor_number'); ?>*</label>
-                                        <input type="number" class="form-control" id="floor_number" name="floor_number" required min="-10" max="100"
-                                               value="<?php echo isset($editRoom['floor_number']) ? (int)$editRoom['floor_number'] : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="area"><?php echo translate('area'); ?> (sqm)*</label>
-                                        <input type="number" step="0.01" class="form-control" id="area" name="area" required min="0"
-                                               value="<?php echo isset($editRoom['area']) ? number_format((float)$editRoom['area'], 2, '.', '') : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="monthly_rent"><?php echo translate('monthly_rent'); ?>*</label>
-                                        <input type="number" step="0.01" class="form-control" id="monthly_rent" name="monthly_rent" required min="0"
-                                               value="<?php echo isset($editRoom['monthly_rent']) ? number_format((float)$editRoom['monthly_rent'], 2, '.', '') : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <div class="custom-control custom-checkbox">
-                                            <input type="checkbox" class="custom-control-input" id="is_occupied" name="is_occupied" 
-                                                   <?php echo isset($editRoom['is_occupied']) && $editRoom['is_occupied'] ? 'checked' : ''; ?>>
-                                            <label class="custom-control-label" for="is_occupied"><?php echo translate('currently_occupied'); ?></label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-footer">
-                                    <button type="submit" class="btn btn-primary"><?php echo isset($_GET['edit']) ? translate('update') : translate('submit'); ?></button>
-                                    <?php if (isset($_GET['edit'])): ?>
-                                        <a href="rooms.php" class="btn btn-default"><?php echo translate('cancel'); ?></a>
-                                    <?php endif; ?>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
                     <!-- Rooms Table -->
-                    <div class="col-md-8">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title"><?php echo translate('list_of_rooms'); ?></h3>
                                 <div class="card-tools">
-                                    <form method="get" class="form-inline">
+                                    <?php if (isAdmin() || isOfficer()): ?>
+                                        <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#roomModal" data-mode="create">
+                                            <i class="fas fa-plus"></i> <?php echo translate('add_new_room'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    <form method="get" class="form-inline ml-2">
                                         <div class="input-group input-group-sm">
                                             <select class="form-control select2" name="building_id" onchange="this.form.submit()">
                                                 <option value=""><?php echo translate('all_buildings'); ?></option>
@@ -499,12 +419,30 @@ $pageTitle = translate('rooms');
                                                 <td><?php echo formatCurrency($row['monthly_rent']); ?></td>
                                                 <td><span class="badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
                                                 <td>
-                                                    <a href="rooms.php?edit=<?php echo (int)$row['room_id']; ?>" class="btn btn-sm btn-primary" title="<?php echo translate('edit'); ?>">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="process_room.php?delete=<?php echo (int)$row['room_id']; ?>" class="btn btn-sm btn-danger" title="<?php echo translate('delete'); ?>" onclick="return confirm('<?php echo translate('confirm_delete_room'); ?>');">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
+                                                    <?php if (isAdmin() || isOfficer()): ?>
+                                                        <button class="btn btn-sm btn-primary edit-room" 
+                                                                data-mode="edit"
+                                                                data-id="<?php echo (int)$row['room_id']; ?>"
+                                                                data-building-id="<?php echo (int)$row['building_id']; ?>"
+                                                                data-type-id="<?php echo (int)$row['type_id']; ?>"
+                                                                data-room-number="<?php echo htmlspecialchars(sanitize($row['room_number'])); ?>"
+                                                                data-floor-number="<?php echo (int)$row['floor_number']; ?>"
+                                                                data-area="<?php echo number_format((float)$row['area'], 2, '.', ''); ?>"
+                                                                data-monthly-rent="<?php echo number_format((float)$row['monthly_rent'], 2, '.', ''); ?>"
+                                                                data-is-occupied="<?php echo (int)$row['is_occupied']; ?>"
+                                                                data-toggle="modal"
+                                                                data-target="#roomModal"
+                                                                title="<?php echo translate('edit'); ?>">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-danger delete-room" 
+                                                                data-id="<?php echo (int)$row['room_id']; ?>"
+                                                                data-toggle="modal"
+                                                                data-target="#deleteModal"
+                                                                title="<?php echo translate('delete'); ?>">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    <?php endif; ?>
                                                     <a href="rent_contracts.php?room=<?php echo (int)$row['room_id']; ?>" class="btn btn-sm btn-info" title="<?php echo translate('view_contracts'); ?>">
                                                         <i class="fas fa-file-contract"></i>
                                                     </a>
@@ -521,6 +459,128 @@ $pageTitle = translate('rooms');
                                         ?>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Room Modal -->
+                <div class="modal fade" id="roomModal" tabindex="-1" role="dialog" aria-labelledby="roomModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="roomModalLabel"><?php echo translate('add_new_room'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                            <form method="post" action="process_room.php" id="roomForm">
+                                <div class="modal-body">
+                                    <input type="hidden" name="edit_id" id="edit_id">
+                                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="building_id"><?php echo translate('building'); ?>*</label>
+                                                <select class="form-control select2-modal" id="building_id" name="building_id" required>
+                                                    <option value=""><?php echo translate('select_building'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $stmt = $conn->prepare("SELECT b.building_id, b.building_name, p.property_name 
+                                                                               FROM buildings b
+                                                                               JOIN properties p ON b.property_id = p.property_id
+                                                                               ORDER BY p.property_name, b.building_name");
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                            $selected = (isset($editRoom['building_id']) && $editRoom['building_id'] == $row['building_id']) ? 'selected' : '';
+                                                    ?>
+                                                        <option value="<?php echo (int)$row['building_id']; ?>" <?php echo $selected; ?>>
+                                                            <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?>
+                                                        </option>
+                                                    <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'][] = "Error fetching buildings: " . sanitize($e->getMessage());
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="type_id"><?php echo translate('room_type'); ?>*</label>
+                                                <select class="form-control select2-modal" id="type_id" name="type_id" required>
+                                                    <option value=""><?php echo translate('select_type'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $stmt = $conn->prepare("SELECT type_id, type_name FROM room_types ORDER BY type_name");
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                            $selected = (isset($editRoom['type_id']) && $editRoom['type_id'] == $row['type_id']) ? 'selected' : '';
+                                                    ?>
+                                                        <option value="<?php echo (int)$row['type_id']; ?>" <?php echo $selected; ?>>
+                                                            <?php echo sanitize($row['type_name']); ?>
+                                                        </option>
+                                                    <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'][] = "Error fetching room types: " . sanitize($e->getMessage());
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="room_number"><?php echo translate('room_number'); ?>*</label>
+                                                <input type="text" class="form-control" id="room_number" name="room_number" required maxlength="50">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="floor_number"><?php echo translate('floor_number'); ?>*</label>
+                                                <input type="number" class="form-control" id="floor_number" name="floor_number" required min="-10" max="100">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="area"><?php echo translate('area'); ?> (sqm)*</label>
+                                                <input type="number" step="0.01" class="form-control" id="area" name="area" required min="0">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="monthly_rent"><?php echo translate('monthly_rent'); ?>*</label>
+                                                <input type="number" step="0.01" class="form-control" id="monthly_rent" name="monthly_rent" required min="0">
+                                            </div>
+                                            <div class="form-group">
+                                                <div class="custom-control custom-checkbox">
+                                                    <input type="checkbox" class="custom-control-input" id="is_occupied" name="is_occupied">
+                                                    <label class="custom-control-label" for="is_occupied"><?php echo translate('currently_occupied'); ?></label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('close'); ?></button>
+                                    <button type="submit" class="btn btn-primary" id="submitRoom"><?php echo translate('submit'); ?></button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Modal -->
+                <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deleteModalLabel"><?php echo translate('confirm_delete'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <?php echo translate('confirm_delete_room'); ?>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('cancel'); ?></button>
+                                <a href="#" id="deleteConfirm" class="btn btn-danger"><?php echo translate('delete'); ?></a>
                             </div>
                         </div>
                     </div>
@@ -544,12 +604,14 @@ $pageTitle = translate('rooms');
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/admin-lte/3.2.0/js/adminlte.min.js"></script>
 
@@ -564,18 +626,24 @@ $(function () {
         "info": true,
         "autoWidth": false,
         "responsive": true,
-        "dom": 'Bfrtip',
-        "buttons": [
-            'copy', 'csv', 'excel', 'pdf', 'print'
-        ],
+        "buttons": ['copy', 'csv', 'excel', 'pdf', 'print'],
+        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+               '<"row"<"col-sm-12"tr>>' +
+               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
         "language": {
             <?php if ($lang === 'am'): ?>
-                "lengthMenu": "በገፅ ላይ _MENU_ መዝገቦችን አሳይ",
-                "zeroRecords": "ምንም መዝገቦች አልተገኙም",
-                "info": "ከ _TOTAL_ መዝገቦች ውስጥ _START_ እስከ _END_ ታይቷል",
-                "infoEmpty": "ምንም መዝገቦች የሉም",
-                "infoFiltered": "(ከ _MAX_ መዝገቦች ተጣርቷል)",
+                "decimal": "",
+                "emptyTable": "ምንም ውሂብ የለም",
+                "info": "_TOTAL_ ከ _START_ እስከ _END_ ያሳያል",
+                "infoEmpty": "0 ከ 0 እስከ 0 ያሳያል",
+                "infoFiltered": "(_MAX_ ከጠቅላላ ተጣርቷል)",
+                "infoPostFix": "",
+                "thousands": ",",
+                "lengthMenu": "_MENU_ ግቤቶችን አሳይ",
+                "loadingRecords": "በመጫን ላይ...",
+                "processing": "በማቀነባበር ላይ...",
                 "search": "ፈልግ:",
+                "zeroRecords": "ምንም ተዛማጅ መዝገቦች አልተገኙም",
                 "paginate": {
                     "first": "መጀመሪያ",
                     "last": "መጨረሻ",
@@ -583,29 +651,104 @@ $(function () {
                     "previous": "ቀዳሚ"
                 },
                 "buttons": {
-                    "copy": "ቅዳ",
-                    "csv": "CSV አውርድ",
-                    "excel": "Excel አውርድ",
-                    "pdf": "PDF አውርድ",
+                    "copy": "ቅጂ",
+                    "csv": "CSV",
+                    "excel": "Excel",
+                    "pdf": "PDF",
                     "print": "አትም"
                 }
             <?php endif; ?>
         }
-    });
-    
-    // Initialize Select2
+    }).buttons().container().appendTo('.card-tools');
+
+    // Initialize Select2 for filters
     $('.select2').select2({
         theme: 'bootstrap4'
     });
 
-    // Form submission confirmation
-    $('#roomForm').on('submit', function(e) {
-        <?php if ($lang === 'am'): ?>
-            return confirm('ይህን ቅጽ ማስገባት ወይም ማዘመን እንደሚፈልጉ እርግጠኛ ነዎት?');
-        <?php else: ?>
-            return confirm('Are you sure you want to submit or update this form?');
-        <?php endif; ?>
+    // Initialize Select2 for modal
+    function initializeModalSelect2() {
+        $('.select2-modal').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#roomModal')
+        });
+    }
+
+    // Call Select2 initialization when modal is shown
+    $('#roomModal').on('shown.bs.modal', function () {
+        initializeModalSelect2();
     });
+
+    // Reset form and Select2 when modal is hidden
+    $('#roomModal').on('hidden.bs.modal', function () {
+        $('#roomForm')[0].reset();
+        $('.select2-modal').val('').trigger('change');
+        $('#edit_id').val('');
+        $('#is_occupied').prop('checked', false);
+        $('#submitRoom').text('<?php echo translate('submit'); ?>');
+        $('#roomModalLabel').text('<?php echo translate('add_new_room'); ?>');
+    });
+
+    // Handle modal show for create/edit
+    $('#roomModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var mode = button.data('mode');
+        var modal = $(this);
+
+        if (mode === 'create') {
+            modal.find('.modal-title').text('<?php echo translate('add_new_room'); ?>');
+            modal.find('#submitRoom').text('<?php echo translate('submit'); ?>');
+            modal.find('#roomForm')[0].reset();
+            modal.find('#building_id').val('').trigger('change');
+            modal.find('#type_id').val('').trigger('change');
+            modal.find('#edit_id').val('');
+            modal.find('#is_occupied').prop('checked', false);
+            <?php if (isset($_GET['building_id']) && is_numeric($_GET['building_id']) && $_GET['building_id'] > 0): ?>
+                modal.find('#building_id').val('<?php echo (int)$_GET['building_id']; ?>').trigger('change');
+            <?php endif; ?>
+        } else if (mode === 'edit') {
+            modal.find('.modal-title').text('<?php echo translate('edit_room'); ?>');
+            modal.find('#submitRoom').text('<?php echo translate('update'); ?>');
+
+            var roomId = button.data('id');
+            $('#edit_id').val(roomId);
+            $('#building_id').val(button.data('building-id')).trigger('change');
+            $('#type_id').val(button.data('type-id')).trigger('change');
+            $('#room_number').val(button.data('room-number'));
+            $('#floor_number').val(button.data('floor-number'));
+            $('#area').val(button.data('area'));
+            $('#monthly_rent').val(button.data('monthly-rent'));
+            $('#is_occupied').prop('checked', button.data('is-occupied') == 1);
+        }
+    });
+
+    // Handle delete button click
+    $('.delete-room').on('click', function() {
+        var roomId = $(this).data('id');
+        $('#deleteConfirm').attr('href', 'process_room.php?delete=' + roomId + '&csrf_token=<?php echo $_SESSION['csrf_token']; ?>');
+    });
+
+    // Auto-open modal for edit mode on page load
+    <?php if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0): ?>
+    $(document).ready(function() {
+        $('#roomModal').modal('show');
+        $('#roomModal').trigger('show.bs.modal', {
+            relatedTarget: {
+                dataset: {
+                    mode: 'edit',
+                    id: <?php echo (int)$_GET['edit']; ?>,
+                    buildingId: <?php echo (int)$editRoom['building_id']; ?>,
+                    typeId: <?php echo (int)$editRoom['type_id']; ?>,
+                    roomNumber: '<?php echo htmlspecialchars(sanitize($editRoom['room_number'])); ?>',
+                    floorNumber: <?php echo (int)$editRoom['floor_number']; ?>,
+                    area: <?php echo number_format((float)$editRoom['area'], 2, '.', ''); ?>,
+                    monthlyRent: <?php echo number_format((float)$editRoom['monthly_rent'], 2, '.', ''); ?>,
+                    isOccupied: <?php echo (int)$editRoom['is_occupied']; ?>
+                }
+            }
+        });
+    });
+    <?php endif; ?>
 });
 </script>
 </body>

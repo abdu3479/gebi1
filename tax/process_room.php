@@ -1,5 +1,5 @@
 <?php
-require_once 'config/database.php';
+require_once '../config/database.php';
 require_once 'includes/helpers.php';
 
 // Ensure user is authenticated and has required role

@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Ensure user is authenticated and has required role
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
-    $_SESSION['error_message'] = "Unauthorized access.";
+    $_SESSION['error_message'] = translate('unauthorized_access');
     redirect('assessments.php');
 }
 
@@ -18,96 +18,74 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
 } catch (Exception $e) {
-    $_SESSION['error_message'] = "Database error: " . sanitize($e->getMessage());
+    $_SESSION['error_message'] = translate('database_error') . ': ' . sanitize($e->getMessage());
     redirect('assessments.php');
+}
+
+// Function to validate CSRF token
+function validateCsrfToken($token) {
+    if (!isset($_SESSION['csrf_token']) || $token !== $_SESSION['csrf_token']) {
+        $error = translate('invalid_csrf_token');
+        logAction(null, $_SESSION['user_id'] ?? 0, "CSRF token validation failed: $error", null, 'security');
+        $_SESSION['error_message'] = $error;
+        redirect('assessments.php');
+    }
 }
 
 // Handle delete request
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    // Verify CSRF token for delete action
-    if (!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']) {
-        $_SESSION['error_message'] = "Invalid security token.";
-        redirect('assessments.php');
-    }
+    validateCsrfToken($_GET['csrf_token'] ?? '');
 
     $conn->begin_transaction();
     try {
+        $stmt = $conn->prepare("SELECT assessment_id FROM tax_assessments WHERE assessment_id = ?");
+        $stmt->bind_param("i", $_GET['delete']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if (!$result->fetch_assoc()) {
+            throw new Exception(translate('assessment_not_found'));
+        }
+        $stmt->close();
+
         $stmt = $conn->prepare("DELETE FROM tax_assessments WHERE assessment_id = ?");
         $stmt->bind_param("i", $_GET['delete']);
         if ($stmt->execute()) {
-            $_SESSION['success_message'] = "Assessment deleted successfully.";
+            logAction($conn, $_SESSION['user_id'] ?? 0, "Deleted assessment ID {$_GET['delete']}", $_GET['delete'], 'tax_assessments');
             $conn->commit();
+            $_SESSION['success_message'] = translate('assessment_deleted');
         } else {
-            throw new Exception("Failed to delete assessment.");
+            throw new Exception(translate('error_deleting_assessment'));
         }
+        $stmt->close();
     } catch (Exception $e) {
         $conn->rollback();
         $_SESSION['error_message'] = $e->getMessage();
-    } finally {
-        if (isset($stmt)) $stmt->close();
-        redirect('assessments.php');
-    }
-}
-
-// Handle status change
-if (isset($_GET['change_status']) && is_numeric($_GET['change_status']) && isset($_GET['new_status'])) {
-    // Verify CSRF token for status change
-    if (!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']) {
-        $_SESSION['error_message'] = "Invalid security token.";
-        redirect('assessments.php');
-    }
-
-    $valid_statuses = ['paid', 'overdue'];
-    $new_status = in_array($_GET['new_status'], $valid_statuses) ? $_GET['new_status'] : null;
-    
-    if ($new_status) {
-        $conn->begin_transaction();
-        try {
-            $stmt = $conn->prepare("UPDATE tax_assessments SET status = ? WHERE assessment_id = ?");
-            $stmt->bind_param("si", $new_status, $_GET['change_status']);
-            if ($stmt->execute()) {
-                $_SESSION['success_message'] = "Assessment status updated to " . ucfirst($new_status) . ".";
-                $conn->commit();
-            } else {
-                throw new Exception("Failed to update assessment status.");
-            }
-        } catch (Exception $e) {
-            $conn->rollback();
-            $_SESSION['error_message'] = $e->getMessage();
-        } finally {
-            if (isset($stmt)) $stmt->close();
-        }
-    } else {
-        $_SESSION['error_message'] = "Invalid status.";
     }
     redirect('assessments.php');
 }
 
-// Handle form submission (add/edit)
+// Handle assessment submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Verify CSRF token for form submission
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $_SESSION['error_message'] = "Invalid security token.";
-        redirect('assessments.php');
-    }
+    validateCsrfToken($_POST['csrf_token'] ?? '');
 
     // Sanitize and validate inputs
+    $edit_id = isset($_POST['edit_id']) && is_numeric($_POST['edit_id']) ? (int)$_POST['edit_id'] : null;
     $property_id = filter_input(INPUT_POST, 'property_id', FILTER_VALIDATE_INT);
     $building_id = filter_input(INPUT_POST, 'building_id', FILTER_VALIDATE_INT) ?: null;
-    $contract_id = filter_input(INPUT_POST, 'contract_id', FILTER_VALIDATE_INT) ?: null;
     $rate_id = filter_input(INPUT_POST, 'rate_id', FILTER_VALIDATE_INT);
     $assessment_date = filter_input(INPUT_POST, 'assessment_date', FILTER_SANITIZE_STRING);
+    $due_date = filter_input(INPUT_POST, 'due_date', FILTER_SANITIZE_STRING);
     $assessed_value = filter_input(INPUT_POST, 'assessed_value', FILTER_VALIDATE_FLOAT);
     $tax_amount = filter_input(INPUT_POST, 'tax_amount', FILTER_VALIDATE_FLOAT);
     $fiscal_year = filter_input(INPUT_POST, 'fiscal_year', FILTER_VALIDATE_INT);
     $notes = filter_input(INPUT_POST, 'notes', FILTER_SANITIZE_STRING) ?: null;
-    $edit_id = isset($_POST['edit_id']) && is_numeric($_POST['edit_id']) ? (int)$_POST['edit_id'] : null;
 
     // Validate required fields
     $required_fields = [
         'property_id' => $property_id,
         'rate_id' => $rate_id,
         'assessment_date' => $assessment_date,
+        'due_date' => $due_date,
         'assessed_value' => $assessed_value,
         'tax_amount' => $tax_amount,
         'fiscal_year' => $fiscal_year
@@ -115,29 +93,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     foreach ($required_fields as $field => $value) {
         if (empty($value)) {
-            $_SESSION['error_message'] = "All required fields must be filled.";
+            $_SESSION['error_message'] = translate('required_fields_missing');
             redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
         }
     }
 
-    // Validate assessment date format and range
-    $date_obj = DateTime::createFromFormat('Y-m-d', $assessment_date);
+    // Validate dates
+    $assessment_date_obj = DateTime::createFromFormat('Y-m-d', $assessment_date);
+    $due_date_obj = DateTime::createFromFormat('Y-m-d', $due_date);
     $today = new DateTime();
-    if (!$date_obj || $date_obj > $today) {
-        $_SESSION['error_message'] = "Invalid assessment date. Must be valid and not in the future.";
+    if (!$assessment_date_obj || $assessment_date_obj > $today) {
+        $_SESSION['error_message'] = translate('invalid_assessment_date');
+        redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
+    }
+    if (!$due_date_obj || $due_date_obj < $assessment_date_obj) {
+        $_SESSION['error_message'] = translate('invalid_due_date');
         redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
 
-    // Validate fiscal year range (e.g., 2000-current year + 1)
-    if ($fiscal_year < 2000 || $fiscal_year > (date('Y') + 1)) {
-        $_SESSION['error_message'] = "Invalid fiscal year.";
+    // Validate property
+    $stmt = $conn->prepare("SELECT property_id FROM properties WHERE property_id = ?");
+    $stmt->bind_param("i", $property_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if (!$result->fetch_assoc()) {
+        $_SESSION['error_message'] = translate('invalid_property');
         redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
+    $stmt->close();
 
-    // Validate assessed value range
-    if ($assessed_value <= 0 || $assessed_value > 1000000000) {
-        $_SESSION['error_message'] = "Assessed value must be between 1 and 1,000,000,000.";
-        redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
+    // Validate building if provided
+    if ($building_id) {
+        $stmt = $conn->prepare("SELECT building_id FROM buildings WHERE building_id = ? AND property_id = ?");
+        $stmt->bind_param("ii", $building_id, $property_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if (!$result->fetch_assoc()) {
+            $_SESSION['error_message'] = translate('invalid_building');
+            redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
+        }
+        $stmt->close();
     }
 
     // Validate tax rate
@@ -147,205 +142,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $stmt->get_result();
     $rate = $result->fetch_assoc();
     $stmt->close();
-
     if (!$rate) {
-        $_SESSION['error_message'] = "Invalid or expired tax rate.";
+        $_SESSION['error_message'] = translate('invalid_tax_rate');
         redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
 
-    // Validate tax calculation
-    $calculated_tax = $assessed_value * ($rate['rate_percentage'] / 100);
-    if (abs($calculated_tax - $tax_amount) > 0.01) {
-        $_SESSION['error_message'] = "Tax amount does not match calculated value. Expected: " . number_format($calculated_tax, 2);
+    // Validate tax amount
+    $expected_tax = $assessed_value * ($rate['rate_percentage'] / 100);
+    if (abs($tax_amount - $expected_tax) > 0.01) {
+        $_SESSION['error_message'] = translate('invalid_tax_amount');
         redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
 
-    // Validate building belongs to property
-    if ($building_id) {
-        $stmt = $conn->prepare("SELECT building_id FROM buildings WHERE building_id = ? AND property_id = ?");
-        $stmt->bind_param("ii", $building_id, $property_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows === 0) {
-            $_SESSION['error_message'] = "Invalid building for selected property.";
-            redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
-        }
-        $stmt->close();
+    // Validate fiscal year
+    if ($fiscal_year < 2000 || $fiscal_year > (int)date('Y') + 1) {
+        $_SESSION['error_message'] = translate('invalid_fiscal_year');
+        redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
 
-    // Validate contract exists if provided
-    if ($contract_id) {
-        $stmt = $conn->prepare("SELECT contract_id FROM rent_contracts WHERE contract_id = ?");
-        $stmt->bind_param("i", $contract_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows === 0) {
-            $_SESSION['error_message'] = "Invalid rent contract ID provided.";
-            redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
-        }
-        $stmt->close();
+    // Validate assessed value
+    if ($assessed_value <= 0 || $assessed_value > 100000000) {
+        $_SESSION['error_message'] = translate('invalid_assessed_value');
+        redirect('assessments.php' . ($edit_id ? '?edit=' . $edit_id : ''));
     }
 
-    // Begin database transaction
+    // Set status to pending for new assessments
+    $status = $edit_id ? null : 'pending';
+
+    // Begin transaction
     $conn->begin_transaction();
     try {
         if ($edit_id) {
             // Update existing assessment
-            $stmt = $conn->prepare("UPDATE tax_assessments SET 
-                                  property_id = ?, 
-                                  building_id = ?, 
-                                  contract_id = ?,
-                                  rate_id = ?, 
-                                  tax_amount = ?, 
-                                  assessed_value = ?, 
-                                  fiscal_year = ?, 
-                                  assessment_date = ?, 
-                                  notes = ?, 
-                                  status = 'pending' 
-                                  WHERE assessment_id = ?");
-            $stmt->bind_param("iiiddisssi", 
+            $stmt = $conn->prepare("
+                UPDATE tax_assessments SET 
+                    property_id = ?, 
+                    building_id = ?, 
+                    rate_id = ?, 
+                    assessment_date = ?, 
+                    due_date = ?, 
+                    assessed_value = ?, 
+                    tax_amount = ?, 
+                    fiscal_year = ?, 
+                    notes = ?
+                WHERE assessment_id = ?
+            ");
+            $stmt->bind_param("iiisssdisi", 
                 $property_id, 
-                $building_id,
-                $contract_id,
+                $building_id, 
                 $rate_id, 
-                $tax_amount, 
-                $assessed_value, 
-                $fiscal_year, 
                 $assessment_date, 
+                $due_date, 
+                $assessed_value, 
+                $tax_amount, 
+                $fiscal_year, 
                 $notes, 
-                $edit_id);
+                $edit_id
+            );
         } else {
-            // Create new assessment
-            $status = 'pending';
-            $stmt = $conn->prepare("INSERT INTO tax_assessments 
-                                   (property_id, building_id, contract_id, rate_id, tax_amount, assessed_value, fiscal_year, assessment_date, notes, status) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("iiiddissss", 
+            // Insert new assessment
+            $stmt = $conn->prepare("
+                INSERT INTO tax_assessments (property_id, building_id, rate_id, assessment_date, due_date, assessed_value, tax_amount, fiscal_year, status, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->bind_param("iiisssdiss", 
                 $property_id, 
-                $building_id,
-                $contract_id,
+                $building_id, 
                 $rate_id, 
-                $tax_amount, 
-                $assessed_value, 
-                $fiscal_year, 
                 $assessment_date, 
-                $notes, 
-                $status);
+                $due_date, 
+                $assessed_value, 
+                $tax_amount, 
+                $fiscal_year, 
+                $status, 
+                $notes
+            );
         }
 
         if ($stmt->execute()) {
+            $assessment_id = $edit_id ?: $conn->insert_id;
+            $action = $edit_id ? "Updated assessment ID $assessment_id" : "Created assessment ID $assessment_id";
+            logAction($conn, $_SESSION['user_id'] ?? 0, $action, $assessment_id, 'tax_assessments');
             $conn->commit();
-            $_SESSION['success_message'] = $edit_id ? "Assessment updated successfully." : "Assessment added successfully.";
-            
-            // Log this action
-            $action = $edit_id ? "Updated assessment ID $edit_id" : "Created new assessment";
-            logAction($conn, $_SESSION['user_id'], $action);
+            $_SESSION['success_message'] = $edit_id ? translate('assessment_updated') : translate('assessment_created');
         } else {
-            throw new Exception($edit_id ? "Failed to update assessment." : "Failed to add assessment.");
+            throw new Exception($edit_id ? translate('error_updating_assessment') : translate('error_creating_assessment'));
         }
+        $stmt->close();
     } catch (Exception $e) {
         $conn->rollback();
         $_SESSION['error_message'] = $e->getMessage();
-    } finally {
-        if (isset($stmt)) $stmt->close();
     }
     
     redirect('assessments.php');
 }
 
-/**
- * Log system actions for audit purposes
- */
-/**
- * Logs system actions with comprehensive error handling and additional metadata
- * 
- * @param mysqli $conn Database connection
- * @param int $user_id ID of the user performing the action
- * @param string $action Description of the action being logged
- * @param int|null $record_id (Optional) ID of the record being affected
- * @param string|null $record_type (Optional) Type of record being affected
- * @return bool Returns true if logging succeeded, false otherwise
- */
-function logAction($conn, $user_id, $action, $record_id = null, $record_type = null) {
-    try {
-        // Get additional context information
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-        
-        // Check if the system_logs table exists
-        $table_check = $conn->query("SHOW TABLES LIKE 'system_logs'");
-        if ($table_check->num_rows === 0) {
-            // Table doesn't exist, create it
-            $create_table = "CREATE TABLE IF NOT EXISTS `system_logs` (
-                `log_id` INT(11) NOT NULL AUTO_INCREMENT,
-                `user_id` INT(11) NOT NULL,
-                `action` VARCHAR(255) NOT NULL,
-                `action_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                `ip_address` VARCHAR(45) DEFAULT NULL,
-                `user_agent` VARCHAR(255) DEFAULT NULL,
-                `record_id` INT(11) DEFAULT NULL,
-                `record_type` VARCHAR(50) DEFAULT NULL,
-                PRIMARY KEY (`log_id`),
-                INDEX `user_id` (`user_id`),
-                INDEX `action_date` (`action_date`),
-                INDEX `record` (`record_type`, `record_id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-            
-            if (!$conn->query($create_table)) {
-                throw new Exception("Failed to create system_logs table");
-            }
-        }
-
-        // Prepare and execute the insert statement
-        $stmt = $conn->prepare("INSERT INTO system_logs 
-                               (user_id, action, ip_address, user_agent, record_id, record_type) 
-                               VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("isssis", 
-            $user_id, 
-            $action, 
-            $ip_address,
-            $user_agent,
-            $record_id,
-            $record_type
-        );
-        
-        $result = $stmt->execute();
-        
-        if (!$result) {
-            throw new Exception("Failed to log action: " . $stmt->error);
-        }
-        
-        return true;
-    } catch (Exception $e) {
-        // Fallback to file logging if database logging fails
-        $logMessage = sprintf(
-            "[%s] [User:%d] [IP:%s] %s %s%s",
-            date('Y-m-d H:i:s'),
-            $user_id,
-            $ip_address ?? 'unknown',
-            $action,
-            $record_id ? "(Record: $record_type#$record_id)" : "",
-            PHP_EOL
-        );
-        
-        // Log to file
-        file_put_contents(
-            __DIR__ . '/../logs/action_errors.log', 
-            $logMessage, 
-            FILE_APPEND
-        );
-        
-        // Log to PHP error log
-        error_log("Action logging failed: " . $e->getMessage());
-        
-        return false;
-    } finally {
-        if (isset($stmt)) {
-            $stmt->close();
-        }
-    }
-}
-
-// If script reaches here without any action being taken
+// If no valid action
+$_SESSION['error_message'] = translate('invalid_request');
 redirect('assessments.php');
 ?>

@@ -7,12 +7,16 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Generate CSRF token if not set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Handle language change
 if (isset($_POST['lang'])) {
     $_SESSION['lang'] = ($_POST['lang'] === 'am') ? 'am' : 'en';
     $redirectUrl = 'rent_contracts.php';
     
-    // Preserve URL parameters
     $params = [];
     if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         $params['edit'] = (int)$_GET['edit'];
@@ -20,7 +24,7 @@ if (isset($_POST['lang'])) {
     if (isset($_GET['room']) && is_numeric($_GET['room'])) {
         $params['room'] = (int)$_GET['room'];
     }
-    if (isset($_GET['status']) && in_array($_GET['status'], ['active', 'terminated', 'completed'])) {
+    if (isset($_GET['status']) && in_array($_GET['status'], ['pending', 'active', 'terminated', 'completed'])) {
         $params['status'] = $_GET['status'];
     }
     
@@ -35,15 +39,18 @@ if (isset($_POST['lang'])) {
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
     $_SESSION['error_message'] = translate('unauthorized_access');
-    redirect('index.php');
+    redirect('dashboard.php');
 }
 
 try {
     $db = new Database();
     $conn = $db->getConnection();
+    
+    // Update contract statuses based on dates
+    updateContractStatuses($conn);
 } catch (Exception $e) {
     $_SESSION['error_message'] = translate('database_error') . ": " . sanitize($e->getMessage());
-    redirect('index.php');
+    redirect('dashboard.php');
 }
 
 // Set role and language
@@ -140,7 +147,6 @@ $pageTitle = translate('rent_contracts');
         </ul>
         
         <ul class="navbar-nav ml-auto">
-            <!-- Language Switcher -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('language'); ?>">
                     <i class="fas fa-globe"></i> <?php echo $lang === 'am' ? 'አማርኛ' : 'English'; ?>
@@ -153,7 +159,6 @@ $pageTitle = translate('rent_contracts');
                 </div>
             </li>
             
-            <!-- Notifications -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('notifications'); ?>">
                     <i class="far fa-bell"></i>
@@ -172,7 +177,6 @@ $pageTitle = translate('rent_contracts');
                 </div>
             </li>
             
-            <!-- User Menu -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('user_menu'); ?>">
                     <i class="far fa-user"></i>
@@ -194,7 +198,7 @@ $pageTitle = translate('rent_contracts');
     </nav>
 
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
-        <a href="index.php" class="brand-link">
+        <a href="dashboard.php" class="brand-link">
             <img src="../assets/images/logo.jpg" alt="<?php echo translate('tax_system_logo'); ?>" class="brand-image img-circle elevation-3" style="opacity: .8">
             <span class="brand-text font-weight-light"><?php echo translate('PMTS'); ?></span>
         </a>
@@ -290,7 +294,7 @@ $pageTitle = translate('rent_contracts');
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1><?php echo translate('rent contract'); ?></h1>
+                        <h1><?php echo translate('rent_contract'); ?></h1>
                     </div>
                     <div class="col-sm-6">
                         <ol class="breadcrumb float-sm-right">
@@ -313,6 +317,7 @@ $pageTitle = translate('rent_contracts');
                                 <h3 class="card-title"><?php echo isset($_GET['edit']) ? translate('edit_contract') : translate('new_contract'); ?></h3>
                             </div>
                             <form method="post" action="process_rent_contract.php">
+                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                                 <?php if (isset($_GET['edit'])): ?>
                                 <input type="hidden" name="edit_id" value="<?php echo (int)$_GET['edit']; ?>">
                                 <?php endif; ?>
@@ -440,6 +445,7 @@ $pageTitle = translate('rent_contracts');
                                         <div class="input-group input-group-sm ml-2">
                                             <select class="form-control" name="status" onchange="this.form.submit()">
                                                 <option value=""><?php echo translate('all_statuses'); ?></option>
+                                                <option value="pending" <?php echo ($_GET['status'] ?? '') == 'pending' ? 'selected' : ''; ?>><?php echo translate('pending'); ?></option>
                                                 <option value="active" <?php echo ($_GET['status'] ?? '') == 'active' ? 'selected' : ''; ?>><?php echo translate('active'); ?></option>
                                                 <option value="terminated" <?php echo ($_GET['status'] ?? '') == 'terminated' ? 'selected' : ''; ?>><?php echo translate('terminated'); ?></option>
                                                 <option value="completed" <?php echo ($_GET['status'] ?? '') == 'completed' ? 'selected' : ''; ?>><?php echo translate('completed'); ?></option>
@@ -481,7 +487,7 @@ $pageTitle = translate('rent_contracts');
                                             }
                                             
                                             if (!empty($_GET['status'])) {
-                                                $validStatuses = ['active', 'terminated', 'completed'];
+                                                $validStatuses = ['pending', 'active', 'terminated', 'completed'];
                                                 $status = in_array($_GET['status'], $validStatuses) ? $_GET['status'] : 'active';
                                                 $sql .= " AND c.status = ?";
                                                 $params[] = $status;
@@ -497,10 +503,13 @@ $pageTitle = translate('rent_contracts');
                                             $stmt->execute();
                                             $result = $stmt->get_result();
                                             
+                                            $today = date('Y-m-d');
                                             while ($row = $result->fetch_assoc()):
-                                                $statusClass = $row['status'] == 'active' ? 'badge-success' : ($row['status'] == 'terminated' ? 'badge-danger' : 'badge-info');
                                                 $roomInfo = sanitize($row['property_name']) . " - " . sanitize($row['building_name']) . " - " . translate('room') . " " . sanitize($row['room_number']);
                                                 $period = date('M d, Y', strtotime($row['start_date'])) . " - " . date('M d, Y', strtotime($row['end_date']));
+                                                $is_future = $row['start_date'] > $today;
+                                                $is_current = $row['start_date'] <= $today && $row['end_date'] >= $today;
+                                                $is_past = $row['end_date'] < $today;
                                                 ?>
                                                 <tr>
                                                     <td><?php echo (int)$row['contract_id']; ?></td>
@@ -509,25 +518,39 @@ $pageTitle = translate('rent_contracts');
                                                     <td><?php echo $period; ?></td>
                                                     <td><?php echo formatCurrency($row['monthly_rent']); ?></td>
                                                     <td><?php echo formatCurrency($row['deposit_amount']); ?></td>
-                                                    <td><span class="badge <?php echo $statusClass; ?>"><?php echo translate($row['status']); ?></span></td>
+                                                    <td>
+                                                        <span class="badge <?php
+                                                            $statusClass = match ($row['status']) {
+                                                                'active' => 'badge-success',
+                                                                'pending' => 'badge-warning',
+                                                                'terminated' => 'badge-danger',
+                                                                'completed' => 'badge-info',
+                                                                default => 'badge-secondary'
+                                                            };
+                                                            echo $statusClass;
+                                                        ?>">
+                                                            <?php echo translate($row['status']); ?>
+                                                        </span>
+                                                    </td>
                                                     <td>
                                                         <a href="rent_contracts.php?edit=<?php echo (int)$row['contract_id']; ?>" class="btn btn-sm btn-primary" title="<?php echo translate('edit'); ?>">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <a href="process_rent_contract.php?delete=<?php echo (int)$row['contract_id']; ?>" class="btn btn-sm btn-danger" title="<?php echo translate('delete'); ?>" onclick="return confirm('<?php echo translate('confirm_delete_contract'); ?>');">
+                                                        <a href="process_rent_contract.php?delete=<?php echo (int)$row['contract_id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-danger" title="<?php echo translate('delete'); ?>" onclick="return confirm('<?php echo translate('confirm_delete_contract'); ?>');">
                                                             <i class="fas fa-trash"></i>
                                                         </a>
-                                                        <?php if ($row['status'] == 'terminated'): ?>
-                                                        <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active" class="btn btn-sm btn-success" title="<?php echo translate('activate'); ?>">
-                                                            <i class="fas fa-check"></i>
-                                                        </a>
-                                                        <?php elseif ($row['status'] == 'active'): ?>
-                                                        <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=terminated" class="btn btn-sm btn-warning" title="<?php echo translate('terminate'); ?>">
-                                                            <i class="fas fa-times"></i>
-                                                        </a>
-                                                        <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=completed" class="btn btn-sm btn-info" title="<?php echo translate('mark_completed'); ?>">
-                                                            <i class="fas fa-flag-checkered"></i>
-                                                        </a>
+                                                        <?php if ($row['status'] === 'pending' && $is_future): ?>
+                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('approve'); ?>">
+                                                                <i class="fas fa-check"></i>
+                                                            </a>
+                                                        <?php elseif ($row['status'] === 'active' && $is_current): ?>
+                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=terminated&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-warning" title="<?php echo translate('terminate'); ?>" onclick="return confirm('<?php echo translate('confirm_terminate_contract'); ?>');">
+                                                                <i class="fas fa-times"></i>
+                                                            </a>
+                                                        <?php elseif ($row['status'] === 'terminated' && $is_current): ?>
+                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('activate'); ?>">
+                                                                <i class="fas fa-check"></i>
+                                                            </a>
                                                         <?php endif; ?>
                                                         <a href="rental_payments.php?contract=<?php echo (int)$row['contract_id']; ?>" class="btn btn-sm btn-info" title="<?php echo translate('view_payments'); ?>">
                                                             <i class="fas fa-file-invoice-dollar"></i>
@@ -620,7 +643,6 @@ $(function () {
         theme: 'bootstrap4'
     });
 
-    // Confirm before submitting form
     $('form').on('submit', function() {
         return confirm('<?php echo $lang === 'am' ? 'ይህን ቅጽ ማስገባት ወይም ማዘመን እንደሚፈልጉ እርግጠኛ ነዎት?' : 'Are you sure you want to submit or update this form?'; ?>');
     });

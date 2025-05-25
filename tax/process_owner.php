@@ -28,7 +28,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     if ($row['property_count'] > 0) {
         $_SESSION['error_message'] = "Cannot delete owner with associated properties.";
     } else {
-        $stmt = $conn->prepare("DELETE FROM owners WHERE owner_id = ?");
+        $stmt = $conn->prepare("DELETE FROM owners WHERE id = ?");
         $stmt->bind_param("i", $_GET['delete']);
         if ($stmt->execute()) {
             $_SESSION['success_message'] = "Owner deleted successfully.";
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Check for duplicate ID number
-    $stmt = $conn->prepare("SELECT owner_id FROM owners WHERE id_number = ? AND owner_id != ?");
+    $stmt = $conn->prepare("SELECT id FROM owners WHERE id_number = ? AND id != ?");
     $stmt->bind_param("si", $id_number, $edit_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($edit_id) {
         // Update owner
-        $stmt = $conn->prepare("UPDATE owners SET full_name = ?, id_number = ?, phone = ?, email = ?, address = ? WHERE owner_id = ?");
+        $stmt = $conn->prepare("UPDATE owners SET full_name = ?, id_number = ?, phone = ?, email = ?, address = ? WHERE id = ?");
         $stmt->bind_param("sssssi", $full_name, $id_number, $phone, $email, $address, $edit_id);
         if ($stmt->execute()) {
             $_SESSION['success_message'] = "Owner updated successfully.";

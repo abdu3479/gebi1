@@ -58,6 +58,146 @@ function formatCurrency($amount, $currency = 'ETB ') {
 }
 
 /**
+ * Log an action to the system logs
+ * @param mysqli $conn Database connection
+ * @param int $user_id User performing the action
+ * @param string $action Description of the action
+ * @param int|null $record_id ID of the affected record
+ * @param string|null $record_type Type of the affected record
+ * @return bool
+ */
+function logAction($conn, $user_id, $action, $record_id = null, $record_type = null) {
+    try {
+        // Get additional context information
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+        
+        if ($conn) {
+            // Check if the system_logs table exists
+            $table_check = $conn->query("SHOW TABLES LIKE 'system_logs'");
+            if ($table_check->num_rows === 0) {
+                // Table doesn't exist, create it
+                $create_table = "CREATE TABLE IF NOT EXISTS `system_logs` (
+                    `log_id` INT(11) NOT NULL AUTO_INCREMENT,
+                    `user_id` INT(11) NOT NULL,
+                    `action` VARCHAR(255) NOT NULL,
+                    `action_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `ip_address` VARCHAR(45) DEFAULT NULL,
+                    `user_agent` VARCHAR(255) DEFAULT NULL,
+                    `record_id` INT(11) DEFAULT NULL,
+                    `record_type` VARCHAR(50) DEFAULT NULL,
+                    PRIMARY KEY (`log_id`),
+                    INDEX `user_id` (`user_id`),
+                    INDEX `action_date` (`action_date`),
+                    INDEX `record` (`record_type`, `record_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+                
+                if (!$conn->query($create_table)) {
+                    throw new Exception("Failed to create system_logs table");
+                }
+            }
+
+            // Prepare and execute the insert statement
+            $stmt = $conn->prepare("INSERT INTO system_logs 
+                                   (user_id, action, ip_address, user_agent, record_id, record_type) 
+                                   VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("isssis", 
+                $user_id, 
+                $action, 
+                $ip_address,
+                $user_agent,
+                $record_id,
+                $record_type
+            );
+            
+            $result = $stmt->execute();
+            
+            if (!$result) {
+                throw new Exception("Failed to log action: " . $stmt->error);
+            }
+            
+            $stmt->close();
+            return true;
+        }
+    } catch (Exception $e) {
+        // Fallback to file logging if database logging fails
+        $logMessage = sprintf(
+            "[%s] [User:%d] [IP:%s] %s %s%s",
+            date('Y-m-d H:i:s'),
+            $user_id,
+            $ip_address ?? 'unknown',
+            $action,
+            $record_id ? "(Record: $record_type#$record_id)" : "",
+            PHP_EOL
+        );
+        
+        // Log to file
+        file_put_contents(
+            __DIR__ . '/../logs/action_errors.log', 
+            $logMessage, 
+            FILE_APPEND
+        );
+        
+        // Log to PHP error log
+        error_log("Action logging failed: " . $e->getMessage());
+    }
+    
+    return false;
+}
+
+/**
+ * Update contract statuses based on start and end dates
+ * @param mysqli $conn Database connection
+ */
+function updateContractStatuses($conn) {
+    $today = date('Y-m-d');
+    $conn->begin_transaction();
+    try {
+        // Fetch contracts that are not terminated
+        $stmt = $conn->prepare("SELECT contract_id, room_id, start_date, end_date, status FROM rent_contracts WHERE status != 'terminated'");
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $contracts = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        foreach ($contracts as $contract) {
+            $new_status = $contract['status'];
+            if ($contract['start_date'] > $today) {
+                $new_status = 'pending';
+            } elseif ($contract['start_date'] <= $today && $contract['end_date'] >= $today) {
+                $new_status = 'active';
+            } elseif ($contract['end_date'] < $today) {
+                $new_status = 'completed';
+            }
+
+            // Update contract status if changed
+            if ($new_status !== $contract['status']) {
+                $stmt = $conn->prepare("UPDATE rent_contracts SET status = ? WHERE contract_id = ?");
+                $stmt->bind_param("si", $new_status, $contract['contract_id']);
+                $stmt->execute();
+                $stmt->close();
+
+                // Update room occupancy
+                $is_occupied = ($new_status === 'active') ? 1 : 0;
+                $stmt = $conn->prepare("UPDATE rooms SET is_occupied = ? WHERE room_id = ?");
+                $stmt->bind_param("ii", $is_occupied, $contract['room_id']);
+                $stmt->execute();
+                $stmt->close();
+
+                // Log the status change
+                logAction($conn, $_SESSION['user_id'] ?? 0, "Auto-updated contract status to $new_status", $contract['contract_id'], 'rent_contract');
+            }
+        }
+
+        $conn->commit();
+    } catch (Exception $e) {
+        $conn->rollback();
+        // Optionally log the error to a file or database
+        error_log("Error updating contract statuses: " . $e->getMessage());
+    }
+}
+
+/**
  * Get the translated string based on language
  * @param string $key
  * @return string
@@ -327,130 +467,94 @@ function translate($key) {
             'type_added' => 'Room type added successfully.',
             'type_updated' => 'Room type updated successfully.',
             'type_deleted' => 'Room type deleted successfully.',
-            'confirm_delete_type' => 'Are you sure you want to delete this room type?'
+            'confirm_delete_type' => 'Are you sure you want to delete this room type?',
+            'contract_not_found' => 'Contract not found.',
+            'contract_already_in_status' => 'Contract is already in this status.',
+            'invalid_status' => 'Invalid status.',
+            'status_must_match_dates' => 'Status must match the contract dates.',
+            'contract_status_updated' => 'Contract status updated to',
+            'failed_to_update_status' => 'Failed to update contract status',
+            'contract_deleted' => 'Contract deleted successfully.',
+            'failed_to_delete_contract' => 'Failed to delete contract',
+            'invalid_csrf_token' => 'Invalid CSRF token.',
+            'required_fields_missing' => 'Required fields are missing.',
+            'end_date_must_be_after_start_date' => 'End date must be after start date.',
+            'invalid_room_selected' => 'Invalid room selected.',
+            'room_not_available' => 'Room is not available.',
+            'overlapping_contract_exists' => 'An overlapping contract already exists.',
+            'failed_to_save_contract' => 'Failed to save contract',
+            'invalid_request' => 'Invalid request.',
+            // New keys for tax assessments page
+            'rental_tax' => 'Rental Tax',
+            'assessment_not_found' => 'Assessment not found.',
+            'select_tax_rate' => 'Select Tax Rate',
+            'due_date' => 'Due Date',
+            'generate_invoice' => 'Generate Invoice',
+            'confirm_delete_assessment' => 'Are you sure you want to delete this assessment?'
         ],
         'am' => [
             'dashboard' => 'ዳሽቦርድ',
             'property_owners' => 'የንብረት ባለቤቶች',
             'properties' => 'ንብረቶች',
             'buildings' => 'ህንፃዎች',
-            'add_new_building' => 'አዲስ ህንፃ ጨምር',
-            'edit_building' => 'ህንፃ አስተካክል',
-            'building_name' => 'የህንፃ ስም',
-            'description' => 'መግለጫ',
-            'select_property' => 'ንብረት ምረጥ',
-            'list_of_buildings' => 'የህንፃዎች ዝርዝር',
-            'show_all_buildings' => 'ሁሉንም ህንፃዎች አሳይ',
-            'floor_count' => 'የወለል ብዛት',
-            'room_count' => 'የክፍሎች ብዛት',
-            'building_area' => 'የህንፃ ስፋት (ካሬ ሜትር)',
-            'construction_type' => 'የግንባታ አይነት',
-            'construction_year' => 'የግንባታ ዓመት',
-            'address' => 'አድራሻ',
-            'building_type' => 'የህንፃ አይነት',
-            'select_construction_type' => 'የግንባታ አይነት ምረጥ',
-            'select_building_type' => 'የህንፃ አይነት ምረጥ',
-            'wood' => 'እንጨት',
-            'concrete' => 'ኮንክሪት',
-            'mixed' => 'ድብልቅ',
-            'new_contract' => 'አዲስ ኪራይ ውል',
-    'edit_contract' => 'ኪራይ ውል አስተካክል',
-    'select_room' => 'ክፍል ምረጥ',
-    'tenant_name' => 'የተከራይ ስም',
-    'tenant_phone' => 'የተከራይ ስልክ',
-    'tenant_id_number' => 'የተከራይ መለያ ቁጥር',
-    'deposit_amount' => 'ዋስትና መጠን',
-    'list_of_rent_contracts' => 'የኪራይ ውሎች ዝርዝር',
-    'room' => 'ክፍል',
-    'tenant' => 'ተከራይ',
-    'period' => 'ጊዜ',
-    'deposit' => 'ዋስትና',
-    'active' => 'ንቁ',
-    'terminated' => 'የተቋረጠ',
-    'completed' => 'የተጠናቀቀ',
-    'confirm_delete_contract' => 'ይህን ኪራይ ውል መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
-    'activate' => 'ንቃተው',
-    'terminate' => 'ተዉው',
-    'mark_completed' => 'እንደተጠናቀቀ ምልክት አድርግ',
-    'view_payments' => 'ክፍያዎችን ተመልከት',
-    'start_date' => 'የመጀመሪያ ቀን',
-    'end_date' => 'የመጨረሻ ቀን',
-    'monthly_rent' => 'ወርሃዊ ኪራይ',
-    'notes' => 'ማስታወሻዎች',
-    'vacancy_reports' => 'የባዶ ክፍሎች ሪፖርቶች',
-    'generate_vacancy_report' => 'የባዶ ክፍሎች ሪፖርት ይፍጠሩ',
-    'reporting_period' => 'የሪፖርት ጊዜ',
-    'submission_method' => 'የማስፈር ዘዴ',
-    'manual_submission' => 'እጅ በእጅ ማስፈር',
-    'api_submission' => 'API በኩል ማስፈር',
-    'email_submission' => 'ኢሜይል በኩል ማስፈር',
-    'report_contents' => 'የሪፖርት ይዘት',
-    'vacancy_report_info' => 'ይህ ሪፖርት ከሪፖርት ጊዜ መጨረሻ ከ30 ቀናት በላይ የቆዩ ባዶ ክፍሎችን ያካትታል።',
-    'quick_stats' => 'ፈጣን ስታቲስቲክስ',
-    'currently_vacant_rooms' => 'አሁን ያሉ ባዶ ክፍሎች',
-    'unreported_vacancies' => 'ያልተለጠፉ ረጅም ጊዜ ያለፉ ባዶ ክፍሎች',
-    'vacant_rooms_requiring_reporting' => 'ሪፖርት የሚያስፈልጋቸው ባዶ ክፍሎች',
-    'days_vacant' => 'ባዶ የሆኑት ቀናት',
-    'last_reported' => 'ያለፈው ሪፖርት',
-    'never' => 'ፈጽሞ',
-    'reported' => 'ተለጥፏል',
-    'non-compliant' => 'ያልተላለፈ',
-    'submitted_reports_history' => 'የቀረቡ ሪፖርቶች ታሪክ',
-    'report_id' => 'የሪፖርት መለያ',
-    'submitted_on' => 'ቀርቧል በ',
-    'vacancies_reported' => 'የተለጠፉ ባዶ ክፍሎች',
-    'reference' => 'ማጣቀሻ',
-    'generate_submit_report' => 'ሪፖርት ፍጠር እና አስፈር',
-    'report_submitted' => 'ሪፖርት በተሳካ ሁኔታ ቀርቧል',
-    'report_submit_failed' => 'ሪፖርት ማስፈር አልተሳካም',
-    'report_error' => 'በሪፖርት ሂደት ላይ ስህተት',
-    'duplicate_report' => 'ለዚህ ጊዜ ያለፈ ሪፖርት አለ',
-    'no_vacant_rooms' => 'ሪፖርት ለማድረግ ባዶ ክፍሎች የሉም',
-    'invalid_report_params' => 'የማይሰራ የሪፖርት መለኪያ',
-    'error_fetching_vacancies' => 'ባዶ ክፍሎችን በማግኘት ላይ ስህተት',
-    'error_fetching_reports' => 'ሪፖርቶችን በማግኘት ላይ ስህተት',
-    'stats_error' => 'ስታቲስቲክስ በማግኘት ላይ ስህተት',
-    'notifications_error' => 'ማሳወቂያዎችን በማግኘት ላይ ስህተት',
-    'january' => 'ጃንዩወሪ',
-    'february' => 'ፌብሩወሪ',
-    'march' => 'ማርች',
-    'april' => 'ኤፕሪል',
-    'may' => 'ሜይ',
-    'june' => 'ጁን',
-    'july' => 'ጁላይ',
-    'august' => 'ኦገስት',
-    'september' => 'ሴፕቴምበር',
-    'october' => 'ኦክቶበር',
-    'november' => 'ኖቬምበር',
-    'december' => 'ዲሴምበር',
-    'contract_not_found' => 'ኪራይ ውል አልተገኘም።',
-    'invalid_contract' => 'የማያገለግል ወይም ንቁ ያልሆነ ኪራይ ውል።',
-    'contract_added' => 'ኪራይ ውል በተሳካ ሁኔታ ታክሏል።',
-    'contract_updated' => 'ኪራይ ውል በተሳካ ሁኔታ ተሻሽሏል።',
-    'contract_deleted' => 'ኪራይ ውል በተሳካ ሁኔታ ተሰርዟል።',
-    'contract_status_changed' => 'የኪራይ ውል ሁኔታ ተቀይሯል።',
-            'Residential' => 'መኖሪያ',
-            'Commercial' => 'ንግድ',
-            'Mixed' => 'ድብልቅ',
-            'Other' => 'ሌላ',
-            'submit' => 'አስገባ',
-            'update' => 'አዘምን',
-            'cancel' => 'ተወው',
-            'actions' => 'ተግባራት',
-            'edit' => 'አስተካክል',
-            'delete' => 'ሰርዝ',
-            'property' => 'ንብረት',
-            'owner' => 'ባለቤት',
+            'due_date' => 'የክፍያ ጊዜ',
+            'rooms' => 'ክፍሎች',
+            'room_types' => 'የክፍል አይነቶች',
+            'rent_contracts' => 'የኪራይ ውሎች',
+            'tax_assessments' => 'የግብር ግምገማዎች',
+            'payments' => 'ክፍያዎች',
+            'rental_payments' => 'የኪራይ ክፍያዎች',
+            'vacancy_reports' => 'የባዶ ክፍሎች ሪፖርቶች',
+            'system_users' => 'የስርዓት ተጠቃሚዎች',
+            'reports' => 'ሪፖርቶች',
+            'profile' => 'የእኔ መገለጫ',
+            'logout' => 'ውጣ',
             'notifications' => 'ማሳወቂያዎች',
             'pending_tax_assessments' => 'በመጠባበቅ ላይ ያሉ የግብር ግምገማዎች',
             'see_all_notifications' => 'ሁሉንም ማሳወቂያዎች ተመልከት',
             'user_menu' => 'የተጠቃሚ ምናሌ',
-            'profile' => 'የእኔ መገለጫ',
-            'logout' => 'ውጣ',
-            'unauthorized_access' => 'ያልተፈቀደ መዳረሻ።',
-            'invalid_form_data' => 'የማይሰራ የቅጽ ውሂብ።',
+            'toggle_sidebar' => 'የጎን አሞሌን ቀያይር',
+            'add_new_owner' => 'አዲስ ባለቤት ጨምር',
+            'edit_owner' => 'ባለቤት አስተካክል',
+            'full_name' => 'ሙሉ ስም',
+            'id_number' => 'የመለያ ቁጥር',
+            'phone' => 'ስልክ',
+            'email' => 'ኢሜይል',
+            'address' => 'አድራሻ',
+            'submit' => 'አስገባ',
+            'update' => 'አዘምን',
+            'cancel' => 'ተወው',
+            'list_of_property_owners' => 'የንብረት ባለቤቶች ዝርዝር',
+            'actions' => 'ተግባራት',
+            'edit' => 'አስተካክል',
+            'delete' => 'ሰርዝ',
+            'view_properties' => 'ንብረቶችን ተመልከት',
+            'new_assessment' => 'አዲስ ግምገማ',
+            'edit_assessment' => 'ግምገማ አስተካክል',
+            'property' => 'ንብረት',
+            'building' => 'ህንፃ',
+            'tax_rate' => 'የግብር መጠን',
+            'assessment_date' => 'የግምገማ ቀን',
+            'assessed_value' => 'የተገመተ ዋጋ',
+            'fiscal_year' => 'የበጀት ዓመት',
+            'notes' => 'ማስታወሻዎች',
+            'list_of_assessments' => 'የግምገማዎች ዝርዝር',
+            'all_statuses' => 'ሁሉም ሁኔታዎች',
+            'pending' => 'በመጠባበቅ ላይ',
+            'paid' => 'ተከፍሏል',
+            'overdue' => 'ከሰአቱ ያለፈ',
+            'all_properties' => 'ሁሉም ንብረቶች',
+            'property_building' => 'ንብረት/ህንፃ',
+            'value' => 'ዋጋ',
+            'tax' => 'ግብር',
+            'year' => 'ዓመት',
+            'status' => 'ሁኔታ',
+            'mark_as_paid' => 'እንደተከፈለ ምልክት አድርግ',
+            'mark_as_overdue' => 'ከሰአቱ እንዳለፈ ምልክት አድርግ',
+            'view_payments' => 'ክፍያዎችን ተመልከት',
             'add_new_property' => 'አዲስ ንብረት ጨምር',
             'edit_property' => 'ንብረት አስተካክል',
+            'owner' => 'ባለቤት',
             'property_name' => 'የንብረት ስም',
             'property_type' => 'የንብረት አይነት',
             'select_owner' => 'ባለቤት ምረጥ',
@@ -466,51 +570,215 @@ function translate($key) {
             'show_all_properties' => 'ሁሉንም ንብረቶች አሳይ',
             'view_buildings' => 'ህንፃዎችን ተመልከት',
             'confirm_delete_property' => 'ይህን ንብረት መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
-            'buildings' => 'ህንፃዎች',
-            'Active' => 'ንቁ',
-            'Exempt' => 'ከግብር ነፃ',
-            'Delinquent' => 'ያልተከፈለ',
+            'add_new_building' => 'አዲስ ህንፃ ጨምር',
+            'edit_building' => 'ህንፃ አስተካክል',
+            'building_name' => 'የህንፃ ስም',
+            'description' => 'መግለጫ',
+            'select_property' => 'ንብረት ምረጥ',
+            'list_of_buildings' => 'የህንፃዎች ዝርዝር',
+            'show_all_buildings' => 'ሁሉንም ህንፃዎች አሳይ',
+            'floor_count' => 'የወለል ብዛት',
+            'room_count' => 'የክፍሎች ብዛት',
+            'building_area' => 'የህንፃ ስፋት (ካሬ ሜትር)',
+            'construction_type' => 'የግንባታ አይነት',
+            'building_type' => 'የህንፃ አይነት',
+            'select_construction_type' => 'የግንባታ አይነት ምረጥ',
+            'select_building_type' => 'የህንፃ አይነት ምረጥ',
+            'wood' => 'እንጨት',
+            'concrete' => 'ኮንክሪት',
+            'mixed' => 'ድብልቅ',
+            'Residential' => 'መኖሪያ',
+            'Commercial' => 'ንግድ',
+            'Mixed' => 'ድብልቅ',
+            'Other' => 'ሌላ',
+            'add_new_payment' => 'አዲስ ክፍያ ጨምር',
+            'edit_payment' => 'ክፍያ አስተካክል',
+            'assessment' => 'ግምገማ',
+            'select_assessment' => 'ግምገማ ምረጥ',
+            'amount' => 'መጠን',
+            'payment_date' => 'የክፍያ ቀን',
+            'payment_method' => 'የክፍያ ዘዴ',
+            'select_payment_method' => 'የክፍያ ዘዴ ምረጥ',
+            'cash' => 'ጥሬ ገንዘብ',
+            'credit_card' => 'ክሬዲት ካርድ',
+            'bank_transfer' => 'የባንክ ዝውውር',
+            'mobile_payment' => 'የሞባይል ክፍያ',
+            'list_of_payments' => 'የክፍያዎች ዝርዝር',
+            'show_all_payments' => 'ሁሉንም ክፍያዎች አሳይ',
+            'report_options' => 'የሪፖርት አማራጮች',
+            'report_type' => 'የሪፖርት አይነት',
+            'tax_collection' => 'የግብር ልኮ',
+            'property_taxes' => 'የንብረት ግብሮች',
+            'building_taxes' => 'የህንፃ ግብሮች',
+            'delinquent_taxes' => 'ያልተከፈሉ ግብሮች',
+            'date_range' => 'የቀን ገደብ',
+            'start_date' => 'የመጀመሪያ ቀን',
+            'end_date' => 'የመጨረሻ ቀን',
+            'generate_report' => 'ሪፖርት ፍጠር',
+            'tax_collection_report' => 'የግብር ልኮ ሪፖርት',
+            'property_tax_report' => 'የንብረት ግብር ሪፖርት',
+            'building_tax_report' => 'የህንፃ ግብር ሪፖርት',
+            'delinquent_tax_report' => 'ያልተከፈሉ ግብሮች ሪፖርት',
+            'print' => 'ተጭን',
+            'export' => 'ላክ',
+            'tax_collection_summary' => 'የግብር ልኮ ማጠቃለያ',
+            'total_collected' => 'ጠቅላላ የተሰበሰበ',
+            'property_id' => 'የንብረት መለያ',
+            'total_tax' => 'ጠቅላላ ግብር',
+            'balance' => 'ቀሪ',
+            'grand_total' => 'አጠቃላይ ድምር',
+            'building_id' => 'የህንፃ መለያ',
+            'assessment_id' => 'የግምገማ መለያ',
+            'tax_amount' => 'የግብር መጠን',
+            'due_date' => 'የማብቂያ ቀን',
+            'days_overdue' => 'ያለፉ ቀናት',
+            'total_delinquent_taxes' => 'ጠቅላላ ያልተከፈሉ ግብሮች',
+            'tax_collected' => 'የተሰበሰበ ግብር',
+            'for_fiscal_year' => 'ለበጀት ዓመት',
             'room_management' => 'የክፍል አስተዳደር',
-    'add_new_room' => 'አዲስ ክፍል ጨምር',
-    'edit_room' => 'ክፍል አስተካክል',
-    'select_building' => 'ህንፃ ምረጥ',
-    'room_type' => 'የክፍል አይነት',
-    'select_type' => 'አይነት ምረጥ',
-    'room_number' => 'የክፍል ቁጥር',
-    'floor_number' => 'የወለል ቁጥር',
-    'area' => 'ስፋት',
-    'monthly_rent' => 'ወርሃዊ ኪራይ',
-    'currently_occupied' => 'አሁን የተያዘ',
-    'list_of_rooms' => 'የክፍሎች ዝርዝር',
-    'all_buildings' => 'ሁሉም ህንፃዎች',
-    'all_rooms' => 'ሁሉም ክፍሎች',
-    'occupied' => 'የተያዘ',
-    'vacant' => 'ባዶ',
-    'id' => 'መለያ',
-    'building_property' => 'ህንፃ/ንብረት',
-    'floor' => 'ወለል',
-    'type' => 'አይነት',
-    'rent' => 'ኪራይ',
-    'confirm_delete_room' => 'ይህን ክፍል መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
-    'view_contracts' => 'ኮንትራቶችን ተመልከት',
-    'tax_assessment' => 'የግብር ግምገማ',
-    'rooms' => 'ክፍሎች',
-    'status' => 'ሁኔታ',
-    'invalid_type_name' => 'የክፍል አይነት ስም ያስፈልጋል እና ከ100 ቁምፊዎች ያነሰ መሆን አለበት።',
-    'duplicate_type_name' => 'ይህ የክፍል አይነት ስም አስቀድሞ አለ።',
-    'error_processing_type' => 'የክፍል አይነት በማስተካከል ላይ ስህተት',
-    'type_has_rooms' => 'ከክፍሎች ጋር የተያያዘ የክፍል አይነት ሊሰረዝ አይችልም።',
-    'error_deleting_type' => 'የክፍል አይነት በሚሰረዝበት ጊዜ ስህተት',
-    'type_added' => 'የክፍል አይነት በተሳካ ሁኔታ ታክሏል።',
-    'type_updated' => 'የክፍል አይነት በተሳካ ሁኔታ ተሻሽሏል።',
-    'type_deleted' => 'የክፍል አይነት በተሳካ ሁኔታ ተሰርዟል።',
-    'confirm_delete_type' => 'ይህን የክፍል አይነት መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
-    'add_new_room_type' => 'አዲስ የክፍል አይነት ጨምር',
-    'edit_room_type' => 'የክፍል አይነት አስተካክል',
-    'type_name' => 'የአይነት ስም',
-    'list_of_room_types' => 'የክፍል አይነቶች ዝርዝር',
-    'room_types' => 'የክፍል አይነቶች'
-
+            'add_new_room' => 'አዲስ ክፍል ጨምር',
+            'edit_room' => 'ክፍል አስተካክል',
+            'select_building' => 'ህንፃ ምረጥ',
+            'room_type' => 'የክፍል አይነት',
+            'select_type' => 'አይነት ምረጥ',
+            'room_number' => 'የክፍል ቁጥር',
+            'floor_number' => 'የወለል ቁጥር',
+            'area' => 'ስፋት',
+            'monthly_rent' => 'ወርሃዊ ኪራይ',
+            'currently_occupied' => 'አሁን የተያዘ',
+            'list_of_rooms' => 'የክፍሎች ዝርዝር',
+            'all_buildings' => 'ሁሉም ህንፃዎች',
+            'all_rooms' => 'ሁሉም ክፍሎች',
+            'occupied' => 'የተያዘ',
+            'vacant' => 'ባዶ',
+            'id' => 'መለያ',
+            'building_property' => 'ህንፃ/ንብረት',
+            'floor' => 'ወለል',
+            'type' => 'አይነት',
+            'rent' => 'ኪራይ',
+            'confirm_delete_room' => 'ይህን ክፍል መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
+            'view_contracts' => 'ኮንትራቶችን ተመልከት',
+            'tax_assessment' => 'የግብር ግምገማ',
+            'new_contract' => 'አዲስ ኪራይ ውል',
+            'edit_contract' => 'ኪራይ ውል አስተካክል',
+            'select_room' => 'ክፍል ምረጥ',
+            'tenant_name' => 'የተከራይ ስም',
+            'tenant_phone' => 'የተከራይ ስልክ',
+            'tenant_id_number' => 'የተከራይ መለያ ቁጥር',
+            'deposit_amount' => 'ዋስትና መጠን',
+            'list_of_rent_contracts' => 'የኪራይ ውሎች ዝርዝር',
+            'room' => 'ክፍል',
+            'tenant' => 'ተከራይ',
+            'period' => 'ጊዜ',
+            'deposit' => 'ዋስትና',
+            'active' => 'ንቁ',
+            'terminated' => 'የተቋረጠ',
+            'completed' => 'የተጠናቀቀ',
+            'confirm_delete_contract' => 'ይህን ኪራይ ውል መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
+            'activate' => 'ንቃተው',
+            'terminate' => 'ተዉው',
+            'mark_completed' => 'እንደተጠናቀቀ ምልክት አድርግ',
+            'view_payments' => 'ክፍያዎችን ተመልከት',
+            'generate_vacancy_report' => 'የባዶ ክፍሎች ሪፖርት ይፍጠሩ',
+            'reporting_period' => 'የሪፖርት ጊዜ',
+            'submission_method' => 'የማስፈር ዘዴ',
+            'manual_submission' => 'እጅ በእጅ ማስፈር',
+            'api_submission' => 'API በኩል ማስፈር',
+            'email_submission' => 'ኢሜይል በኩል ማስፈር',
+            'report_contents' => 'የሪፖርት ይዘት',
+            'vacancy_report_info' => 'ይህ ሪፖርት ከሪፖርት ጊዜ መጨረሻ ከ30 ቀናት በላይ የቆዩ ባዶ ክፍሎችን ያካትታል።',
+            'quick_stats' => 'ፈጣን ስታቲስቲክስ',
+            'currently_vacant_rooms' => 'አሁን ያሉ ባዶ ክፍሎች',
+            'unreported_vacancies' => 'ያልተለጠፉ ረጅም ጊዜ ያለፉ ባዶ ክፍሎች',
+            'vacant_rooms_requiring_reporting' => 'ሪፖርት የሚያስፈልጋቸው ባዶ ክፍሎች',
+            'owner' => 'ባለቤት',
+            'days_vacant' => 'ባዶ የሆኑት ቀናት',
+            'last_reported' => 'ያለፈው ሪፖርት',
+            'never' => 'ፈጽሞ',
+            'reported' => 'ተለጥፏል',
+            'non-compliant' => 'ያልተላለፈ',
+            'submitted_reports_history' => 'የቀረቡ ሪፖርቶች ታሪክ',
+            'report_id' => 'የሪፖርት መለያ',
+            'submitted_on' => 'ቀርቧል በ',
+            'vacancies_reported' => 'የተለጠፉ ባዶ ክፍሎች',
+            'reference' => 'ማጣቀሻ',
+            'generate_submit_report' => 'ሪፖርት ፍጠር እና አስፈር',
+            'new_payment' => 'አዲስ ክፍያ',
+            'rent_contract' => 'ኪራይ ውል',
+            'select_contract' => 'ውል ምረጥ',
+            'period_month' => 'የጊዜ ወር',
+            'select_month' => 'ወር ምረጥ',
+            'period_year' => 'የጊዜ ዓመት',
+            'receipt_number' => 'የደረሰኝ ቁጥር',
+            'received_by' => 'የተቀበለው በ',
+            'room_tenant' => 'ክፍል/ተከራይ',
+            'date' => 'ቀን',
+            'method' => 'ዘዴ',
+            'receipt' => 'ደረሰኝ',
+            'contract_details' => 'የውል ዝርዝሮች',
+            'contract_period' => 'የውል ጊዜ',
+            'print_receipt' => 'ደረሰኝ ተጭን',
+            'january' => 'ጥር',
+            'february' => 'ይካቲት',
+            'march' => 'መጋቢት',
+            'april' => 'ሚያዝያ',
+            'may' => 'ግንቦት',
+            'june' => 'ሰኔ',
+            'july' => 'ሐምሌ',
+            'august' => 'ነሐሴ',
+            'september' => 'መስከረም',
+            'october' => 'ጥቅምት',
+            'november' => 'ህዳር',
+            'december' => 'ታህሳስ',
+            'unauthorized_access' => 'ያልተፈቀደ መዳረሻ።',
+            'invalid_form_data' => 'የማይሰራ የቅጽ ውሂብ።',
+            'invalid_contract' => 'የማያገለግል ወይም ንቁ ያልሆነ ኪራይ ውል።',
+            'duplicate_payment_period' => 'ለዚህ ውል እና ጊዜ ክፍያ ቀድሞውኑ አለ።',
+            'error_processing_payment' => 'ክፍያ በማስኬድ ላይ ስህተት',
+            'invalid_delete_request' => 'የማይሰራ የመሰረዝ ጥያቄ።',
+            'payment_not_found' => 'ክፍያ አልተገኘም።',
+            'error_deleting_payment' => 'ክፍያ በሚሰረዝበት ጊዜ ስህተት',
+            'payment_added' => 'ክፍያ በተሳካ ሁኔታ ታክሏል።',
+            'payment_updated' => 'ክፍያ በተሳካ ሁኔታ ተሻሽሏል።',
+            'payment_deleted' => 'ክፍያ በተሳካ ሁኔታ ተሰርዟል።',
+            'confirm_delete_payment' => 'ይህን ክፍያ መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
+            'error_fetching_rent' => 'የኪራይ መጠን በማግኘት ላይ ስህተት።',
+            'add_new_room_type' => 'አዲስ የክፍል አይነት ጨምር',
+            'edit_room_type' => 'የክፍል አይነት አስተካክል',
+            'type_name' => 'የአይነት ስም',
+            'list_of_room_types' => 'የክፍል አይነቶች ዝርዝር',
+            'invalid_type_name' => 'የክፍል አይነት ስም ያስፈልጋል እና ከ100 ቁምፊዎች ያነሰ መሆን አለበት።',
+            'duplicate_type_name' => 'ይህ የክፍል አይነት ስም አስቀድሞ አለ።',
+            'error_processing_type' => 'የክፍል አይነት በማስተካከል ላይ ስህተት',
+            'type_has_rooms' => 'ከክፍሎች ጋር የተያያዘ የክፍል አይነት ሊሰረዝ አይችልም።',
+            'error_deleting_type' => 'የክፍል አይነት በሚሰረዝበት ጊዜ ስህተት',
+            'type_added' => 'የክፍል አይነት በተሳካ ሁኔታ ታክሏል።',
+            'type_updated' => 'የክፍል አይነት በተሳካ ሁኔታ ተሻሽሏል።',
+            'type_deleted' => 'የክፍል አይነት በተሳካ ሁኔታ ተሰርዟል።',
+            'confirm_delete_type' => 'ይህን የክፍል አይነት መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
+            'contract_not_found' => 'ኪራይ ውል አልተገኘም።',
+            'contract_already_in_status' => 'ኪራይ ውል ቀድሞውኑ በዚህ ሁኔታ ላይ ነው።',
+            'invalid_status' => 'የማይሰራ ሁኔታ።',
+            'status_must_match_dates' => 'ሁኔታው ከውሉ ቀኖች ጋር መጣጣም አለበት።',
+            'contract_status_updated' => 'የኪራይ ውል ሁኔታ ወደ',
+            'failed_to_update_status' => 'የኪራይ ውል ሁኔታን ማዘመን አልተሳካም',
+            'contract_deleted' => 'ኪራይ ውል በተሳካ ሁኔታ ተሰርዟል።',
+            'failed_to_delete_contract' => 'ኪራይ ውል መሰረዝ አልተሳካም',
+            'invalid_csrf_token' => 'የማይሰራ CSRF ማስመሰያ።',
+            'required_fields_missing' => 'አስፈላጊ መስኮች ጎድለዋል።',
+            'end_date_must_be_after_start_date' => 'የመጨረሻ ቀን ከመጀመሪያ ቀን በኋላ መሆን አለበት።',
+            'invalid_room_selected' => 'የማይሰራ ክፍል ተመርጧል።',
+            'room_not_available' => 'ክፍሉ አይገኝም።',
+            'overlapping_contract_exists' => 'ተደራራቢ ኪራይ ውል ቀድሞውኑ አለ።',
+            'failed_to_save_contract' => 'ኪራይ ውል መቆጠብ አልተሳካም',
+            'invalid_request' => 'የማይሰራ ጥያቄ።',
+            // New keys for tax assessments page
+            'rental_tax' => 'የኪራይ ግብር',
+            'assessment_not_found' => 'ግምገማ አልተገኘም።',
+            'select_tax_rate' => 'የግብር መጠን ምረጥ',
+            'due_date' => 'የማብቂያ ቀን',
+            'generate_invoice' => 'ደረሰኝ ፍጠር',
+            'confirm_delete_assessment' => 'ይህን ግምገማ መሰረዝ መፈለግዎን እርግጠኛ ነዎት?'
         ]
     ];
     $lang = $_SESSION['lang'] ?? 'en';

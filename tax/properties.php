@@ -2,6 +2,16 @@
 require_once '../config/database.php';
 require_once 'includes/helpers.php';
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Generate CSRF token if not set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Ensure user is authenticated and has required role
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
@@ -12,11 +22,7 @@ if (!isAdmin() && !isOfficer()) {
 // Handle language change
 if (isset($_POST['lang']) && in_array($_POST['lang'], ['en', 'am'])) {
     $_SESSION['lang'] = $_POST['lang'];
-    $redirectUrl = 'properties.php';
-    if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
-        $redirectUrl .= '?edit=' . (int)$_GET['edit'];
-    }
-    redirect($redirectUrl);
+    redirect('properties.php');
 }
 
 // Initialize database connection
@@ -32,27 +38,6 @@ try {
 $role = $_SESSION['role'] ?? 'viewer';
 $lang = $_SESSION['lang'] ?? 'en';
 $is_viewer = $role === 'viewer';
-
-// Fetch property data for editing
-$editProperty = [];
-if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0) {
-    $editId = (int)$_GET['edit'];
-    try {
-        $stmt = $conn->prepare("SELECT p.*, pt.name AS type_name FROM properties p LEFT JOIN property_types pt ON p.type_id = pt.id WHERE p.property_id = ?");
-        $stmt->bind_param("i", $editId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $editProperty = $result->fetch_assoc();
-        $stmt->close();
-        if (!$editProperty) {
-            $_SESSION['error_messages'][] = translate("Property not found.");
-            redirect('properties.php');
-        }
-    } catch (Exception $e) {
-        $_SESSION['error_messages'][] = "Error fetching property: " . sanitize($e->getMessage());
-        redirect('properties.php');
-    }
-}
 
 // Get notifications count
 $notificationsCount = 0;
@@ -99,11 +84,13 @@ $pageTitle = translate('properties');
         body, input, select, textarea, .datatable {
             font-family: 'Noto Sans Ethiopic', 'Source Sans Pro', sans-serif;
         }
+        .modal-lg {
+            max-width: 800px;
+        }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
-    <!-- Main Header -->
     <nav class="main-header navbar navbar-expand navbar-white navbar-light">
         <ul class="navbar-nav">
             <li class="nav-item">
@@ -111,19 +98,6 @@ $pageTitle = translate('properties');
             </li>
         </ul>
         <ul class="navbar-nav ml-auto">
-            <!-- Language Dropdown -->
-            <li class="nav-item dropdown">
-                <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('language'); ?>">
-                    <i class="fas fa-globe"></i> <?php echo $lang === 'am' ? 'አማርኛ' : 'English'; ?>
-                </a>
-                <div class="dropdown-menu dropdown-menu-right">
-                    <form method="post" action="">
-                        <button type="submit" name="lang" value="en" class="dropdown-item">English</button>
-                        <button type="submit" name="lang" value="am" class="dropdown-item">አማርኛ</button>
-                    </form>
-                </div>
-            </li>
-            <!-- Notifications Dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('notifications'); ?>">
                     <i class="far fa-bell"></i>
@@ -141,7 +115,6 @@ $pageTitle = translate('properties');
                     <a href="assessments.php" class="dropdown-item dropdown-footer"><?php echo translate('see_all_notifications'); ?></a>
                 </div>
             </li>
-            <!-- User Menu Dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('user_menu'); ?>">
                     <i class="far fa-user"></i>
@@ -162,11 +135,10 @@ $pageTitle = translate('properties');
         </ul>
     </nav>
 
-    <!-- Main Sidebar -->
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <a href="index.php" class="brand-link">
             <img src="../assets/images/logo.jpg" alt="Tax System Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
-            <span class="brand-text font-weight-light"><?php echo $lang === 'am' ? 'የግብር አስተዳደር' : 'Tax Management'; ?></span>
+            <span class="brand-text font-weight-light">Tax Management</span>
         </a>
         <div class="sidebar">
             <div class="user-panel mt-3 pb-3 mb-3 d-flex">
@@ -181,7 +153,7 @@ $pageTitle = translate('properties');
             <nav class="mt-2">
                 <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
                     <li class="nav-item">
-                        <a href="index.php" class="nav-link">
+                        <a href="dashboard.php" class="nav-link">
                             <i class="nav-icon fas fa-tachometer-alt"></i>
                             <p><?php echo translate('dashboard'); ?></p>
                         </a>
@@ -203,6 +175,18 @@ $pageTitle = translate('properties');
                             <a href="buildings.php" class="nav-link">
                                 <i class="nav-icon fas fa-building"></i>
                                 <p><?php echo translate('buildings'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="rooms.php" class="nav-link">
+                                <i class="nav-icon fas fa-building"></i>
+                                <p><?php echo translate('rooms'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="rental_tax.php" class="nav-link">
+                                <i class="nav-icon fas fa-building"></i>
+                                <p><?php echo translate('rental_tax'); ?></p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -243,7 +227,6 @@ $pageTitle = translate('properties');
         </div>
     </aside>
 
-    <!-- Content Wrapper -->
     <div class="content-wrapper">
         <section class="content-header">
             <div class="container-fluid">
@@ -263,140 +246,20 @@ $pageTitle = translate('properties');
 
         <section class="content">
             <div class="container-fluid">
-                <!-- Display Session Messages -->
                 <?php displayMessages(); ?>
                 
                 <div class="row">
-                    <!-- Property Form -->
-                    <div class="col-md-4">
-                        <div class="card card-primary">
-                            <div class="card-header">
-                                <h3 class="card-title"><?php echo isset($_GET['edit']) ? translate('edit_property') : translate('add_new_property'); ?></h3>
-                            </div>
-                            <form method="post" action="process_property.php" id="propertyForm">
-                                <?php if (isset($_GET['edit'])): ?>
-                                    <input type="hidden" name="edit_id" value="<?php echo (int)$_GET['edit']; ?>">
-                                <?php endif; ?>
-                                <div class="card-body">
-                                    <div class="form-group">
-                                        <label for="owner_id"><?php echo translate('owner'); ?>*</label>
-                                        <select class="form-control select2" id="owner_id" name="owner_id" required>
-                                            <option value=""><?php echo translate('select_owner'); ?></option>
-                                            <?php
-                                            try {
-                                                $stmt = $conn->prepare("SELECT id, full_name FROM owners ORDER BY full_name");
-                                                $stmt->execute();
-                                                $result = $stmt->get_result();
-                                                while ($row = $result->fetch_assoc()):
-                                                    $selected = (isset($editProperty['owner_id']) && $editProperty['owner_id'] == $row['id']) ? 'selected' : '';
-                                            ?>
-                                                <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
-                                                    <?php echo sanitize($row['full_name']); ?>
-                                                </option>
-                                            <?php endwhile; 
-                                                $stmt->close();
-                                            } catch (Exception $e) {
-                                                $_SESSION['error_messages'][] = "Error fetching owners: " . sanitize($e->getMessage());
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="type_id"><?php echo translate('property_type'); ?>*</label>
-                                        <select class="form-control select2" id="type_id" name="type_id" required>
-                                            <option value=""><?php echo translate('select_property_type'); ?></option>
-                                            <?php
-                                            try {
-                                                $stmt = $conn->prepare("SELECT id, name FROM property_types ORDER BY name");
-                                                $stmt->execute();
-                                                $result = $stmt->get_result();
-                                                while ($row = $result->fetch_assoc()):
-                                                    $selected = (isset($editProperty['type_id']) && $editProperty['type_id'] == $row['id']) ? 'selected' : '';
-                                            ?>
-                                                <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
-                                                    <?php echo sanitize($row['name']); ?>
-                                                </option>
-                                            <?php endwhile; 
-                                                $stmt->close();
-                                            } catch (Exception $e) {
-                                                $_SESSION['error_messages'][] = "Error fetching property types: " . sanitize($e->getMessage());
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="property_name"><?php echo translate('property_name'); ?>*</label>
-                                        <input type="text" class="form-control" id="property_name" name="property_name" required maxlength="100"
-                                               value="<?php echo isset($editProperty['property_name']) ? sanitize($editProperty['property_name']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="address"><?php echo translate('address'); ?>*</label>
-                                        <textarea class="form-control" id="address" name="address" rows="3" required><?php echo isset($editProperty['address']) ? sanitize($editProperty['address']) : ''; ?></textarea>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="area"><?php echo translate('area'); ?>*</label>
-                                        <input type="number" step="0.01" class="form-control" id="area" name="area" required min="0"
-                                               value="<?php echo isset($editProperty['area']) ? (float)$editProperty['area'] : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="registration_number"><?php echo translate('registration_number'); ?></label>
-                                        <input type="text" class="form-control" id="registration_number" name="registration_number" maxlength="50"
-                                               value="<?php echo isset($editProperty['registration_number']) ? sanitize($editProperty['registration_number']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="construction_year"><?php echo translate('construction_year'); ?></label>
-                                        <input type="number" class="form-control" id="construction_year" name="construction_year" min="1900" max="<?php echo date('Y'); ?>"
-                                               value="<?php echo isset($editProperty['construction_year']) ? (int)$editProperty['construction_year'] : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="valuation"><?php echo translate('valuation'); ?></label>
-                                        <input type="number" step="0.01" class="form-control" id="valuation" name="valuation" min="0"
-                                               value="<?php echo isset($editProperty['valuation']) ? (float)$editProperty['valuation'] : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="zoning"><?php echo translate('zoning'); ?></label>
-                                        <input type="text" class="form-control" id="zoning" name="zoning" maxlength="100"
-                                               value="<?php echo isset($editProperty['zoning']) ? sanitize($editProperty['zoning']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="registration_date"><?php echo translate('registration_date'); ?></label>
-                                        <input type="date" class="form-control" id="registration_date" name="registration_date"
-                                               value="<?php echo isset($editProperty['registration_date']) ? $editProperty['registration_date'] : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="tax_status"><?php echo translate('tax_status'); ?>*</label>
-                                        <select class="form-control select2" id="tax_status" name="tax_status" required>
-                                            <option value=""><?php echo translate('select_tax_status'); ?></option>
-                                            <?php
-                                            $tax_statuses = ['Active', 'Exempt', 'Delinquent'];
-                                            foreach ($tax_statuses as $status):
-                                                $selected = (isset($editProperty['tax_status']) && $editProperty['tax_status'] == $status) ? 'selected' : '';
-                                            ?>
-                                                <option value="<?php echo $status; ?>" <?php echo $selected; ?>><?php echo translate($status); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="card-footer">
-                                    <button type="submit" class="btn btn-primary"><?php echo isset($_GET['edit']) ? translate('update') : translate('submit'); ?></button>
-                                    <?php if (isset($_GET['edit'])): ?>
-                                        <a href="properties.php" class="btn btn-default"><?php echo translate('cancel'); ?></a>
-                                    <?php endif; ?>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <!-- Properties Table -->
-                    <div class="col-md-8">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title"><?php echo translate('list_of_properties'); ?></h3>
-                                <?php if (isset($_GET['owner']) && is_numeric($_GET['owner']) && $_GET['owner'] > 0): ?>
-                                    <div class="card-tools">
-                                        <a href="properties.php" class="btn btn-sm btn-secondary"><?php echo translate('show_all_properties'); ?></a>
-                                    </div>
-                                <?php endif; ?>
+                                <div class="card-tools">
+                                    <?php if (isAdmin() || isOfficer()): ?>
+                                        <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#propertyModal" data-mode="create">
+                                            <i class="fas fa-plus"></i> <?php echo translate('add_new_property'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <table class="table table-bordered table-hover datatable">
@@ -408,10 +271,6 @@ $pageTitle = translate('properties');
                                             <th><?php echo translate('property_type'); ?></th>
                                             <th><?php echo translate('area'); ?></th>
                                             <th><?php echo translate('registration_number'); ?></th>
-                                            <th><?php echo translate('construction_year'); ?></th>
-                                            <th><?php echo translate('valuation'); ?></th>
-                                            <th><?php echo translate('zoning'); ?></th>
-                                            <th><?php echo translate('registration_date'); ?></th>
                                             <th><?php echo translate('tax_status'); ?></th>
                                             <th><?php echo translate('buildings'); ?></th>
                                             <th><?php echo translate('actions'); ?></th>
@@ -424,23 +283,14 @@ $pageTitle = translate('properties');
                                                     FROM properties p 
                                                     JOIN owners o ON p.owner_id = o.id 
                                                     LEFT JOIN property_types pt ON p.type_id = pt.id 
-                                                    LEFT JOIN buildings b ON p.property_id = b.property_id";
-                                            $params = [];
-                                            $types = '';
+                                                    LEFT JOIN buildings b ON p.property_id = b.property_id
+                                                    GROUP BY p.property_id, o.full_name, pt.name
+                                                    ORDER BY p.property_name";
                                             
-                                            if (isset($_GET['owner']) && is_numeric($_GET['owner']) && $_GET['owner'] > 0) {
-                                                $sql .= " WHERE p.owner_id = ?";
-                                                $params[] = (int)$_GET['owner'];
-                                                $types .= 'i';
-                                            }
-                                            
-                                            $sql .= " GROUP BY p.property_id ORDER BY p.property_name";
                                             $stmt = $conn->prepare($sql);
-                                            if (!empty($params)) {
-                                                $stmt->bind_param($types, ...$params);
-                                            }
                                             $stmt->execute();
                                             $result = $stmt->get_result();
+                                            
                                             while ($row = $result->fetch_assoc()):
                                         ?>
                                             <tr>
@@ -450,20 +300,40 @@ $pageTitle = translate('properties');
                                                 <td><?php echo sanitize($row['type_name'] ?? '-'); ?></td>
                                                 <td><?php echo number_format((float)$row['area'], 2); ?></td>
                                                 <td><?php echo $row['registration_number'] ? sanitize($row['registration_number']) : '-'; ?></td>
-                                                <td><?php echo $row['construction_year'] ? (int)$row['construction_year'] : '-'; ?></td>
-                                                <td><?php echo $row['valuation'] !== null ? formatCurrency($row['valuation']) : '-'; ?></td>
-                                                <td><?php echo $row['zoning'] ? sanitize($row['zoning']) : '-'; ?></td>
-                                                <td><?php echo $row['registration_date'] ? $row['registration_date'] : '-'; ?></td>
                                                 <td><?php echo translate($row['tax_status']); ?></td>
                                                 <td><?php echo (int)$row['building_count']; ?></td>
                                                 <td>
-                                                    <a href="properties.php?edit=<?php echo (int)$row['property_id']; ?>" class="btn btn-sm btn-primary" title="<?php echo translate('edit'); ?>">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="process_property.php?delete=<?php echo (int)$row['property_id']; ?>" class="btn btn-sm btn-danger" title="<?php echo translate('delete'); ?>" onclick="return confirm('<?php echo translate('confirm_delete_property'); ?>');">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
-                                                    <a href="buildings.php?property=<?php echo (int)$row['property_id']; ?>" class="btn btn-sm btn-info" title="<?php echo translate('view_buildings'); ?>">
+                                                    <?php if (isAdmin() || isOfficer()): ?>
+                                                        <button class="btn btn-sm btn-primary edit-property" 
+                                                                data-mode="edit"
+                                                                data-id="<?php echo (int)$row['property_id']; ?>"
+                                                                data-owner-id="<?php echo (int)$row['owner_id']; ?>"
+                                                                data-type-id="<?php echo (int)$row['type_id']; ?>"
+                                                                data-property-name="<?php echo htmlspecialchars(sanitize($row['property_name'])); ?>"
+                                                                data-address="<?php echo htmlspecialchars(sanitize($row['address'])); ?>"
+                                                                data-area="<?php echo (float)$row['area']; ?>"
+                                                                data-registration-number="<?php echo htmlspecialchars(sanitize($row['registration_number'])); ?>"
+                                                                data-construction-year="<?php echo (int)$row['construction_year']; ?>"
+                                                                data-valuation="<?php echo (float)$row['valuation']; ?>"
+                                                                data-zoning="<?php echo htmlspecialchars(sanitize($row['zoning'])); ?>"
+                                                                data-registration-date="<?php echo $row['registration_date']; ?>"
+                                                                data-tax-status="<?php echo sanitize($row['tax_status']); ?>"
+                                                                data-toggle="modal"
+                                                                data-target="#propertyModal"
+                                                                title="<?php echo translate('edit'); ?>">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-danger delete-property" 
+                                                                data-id="<?php echo (int)$row['property_id']; ?>"
+                                                                data-toggle="modal"
+                                                                data-target="#deleteModal"
+                                                                title="<?php echo translate('delete'); ?>">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    <a href="buildings.php?property=<?php echo (int)$row['property_id']; ?>" 
+                                                       class="btn btn-sm btn-info" 
+                                                       title="<?php echo translate('view_buildings'); ?>">
                                                         <i class="fas fa-building"></i>
                                                     </a>
                                                 </td>
@@ -480,16 +350,151 @@ $pageTitle = translate('properties');
                         </div>
                     </div>
                 </div>
+
+                <!-- Property Modal -->
+                <div class="modal fade" id="propertyModal" tabindex="-1" role="dialog" aria-labelledby="propertyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="propertyModalLabel"><?php echo translate('add_new_property'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <form method="post" action="process_property.php" id="propertyForm">
+                                <div class="modal-body">
+                                    <input type="hidden" name="edit_id" id="edit_id">
+                                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="modal_owner_id"><?php echo translate('owner'); ?>*</label>
+                                                <select class="form-control select2-modal" id="modal_owner_id" name="owner_id" required>
+                                                    <option value=""><?php echo translate('select_owner'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $stmt = $conn->prepare("SELECT id, full_name FROM owners ORDER BY full_name");
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                    ?>
+                                                        <option value="<?php echo (int)$row['id']; ?>">
+                                                            <?php echo sanitize($row['full_name']); ?>
+                                                        </option>
+                                                    <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'][] = "Error fetching owners: " . sanitize($e->getMessage());
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_type_id"><?php echo translate('property_type'); ?>*</label>
+                                                <select class="form-control select2-modal" id="modal_type_id" name="type_id" required>
+                                                    <option value=""><?php echo translate('select_property_type'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $stmt = $conn->prepare("SELECT id, name FROM property_types ORDER BY name");
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                    ?>
+                                                        <option value="<?php echo (int)$row['id']; ?>">
+                                                            <?php echo sanitize($row['name']); ?>
+                                                        </option>
+                                                    <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'][] = "Error fetching property types: " . sanitize($e->getMessage());
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_property_name"><?php echo translate('property_name'); ?>*</label>
+                                                <input type="text" class="form-control" id="modal_property_name" name="property_name" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_address"><?php echo translate('address'); ?>*</label>
+                                                <textarea class="form-control" id="modal_address" name="address" rows="3" required></textarea>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_area"><?php echo translate('area'); ?>*</label>
+                                                <input type="number" step="0.01" class="form-control" id="modal_area" name="area" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="modal_registration_number"><?php echo translate('registration_number'); ?></label>
+                                                <input type="text" class="form-control" id="modal_registration_number" name="registration_number">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_construction_year"><?php echo translate('construction_year'); ?></label>
+                                                <input type="number" class="form-control" id="modal_construction_year" name="construction_year">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_valuation"><?php echo translate('valuation'); ?></label>
+                                                <input type="number" step="0.01" class="form-control" id="modal_valuation" name="valuation">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_zoning"><?php echo translate('zoning'); ?></label>
+                                                <input type="text" class="form-control" id="modal_zoning" name="zoning">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_registration_date"><?php echo translate('registration_date'); ?></label>
+                                                <input type="date" class="form-control" id="modal_registration_date" name="registration_date">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="modal_tax_status"><?php echo translate('tax_status'); ?>*</label>
+                                                <select class="form-control select2-modal" id="modal_tax_status" name="tax_status" required>
+                                                    <option value=""><?php echo translate('select_tax_status'); ?></option>
+                                                    <option value="Active"><?php echo translate('Active'); ?></option>
+                                                    <option value="Exempt"><?php echo translate('Exempt'); ?></option>
+                                                    <option value="Delinquent"><?php echo translate('Delinquent'); ?></option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('close'); ?></button>
+                                    <button type="submit" class="btn btn-primary" id="submitProperty"><?php echo translate('submit'); ?></button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Modal -->
+                <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deleteModalLabel"><?php echo translate('confirm_delete'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <?php echo translate('confirm_delete_property'); ?>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('cancel'); ?></button>
+                                <a href="#" id="deleteConfirm" class="btn btn-danger"><?php echo translate('delete'); ?></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 
-    <!-- Main Footer -->
     <footer class="main-footer">
-        <strong><?php echo $lang === 'am' ? 'የቅጂ መብት © ' . date('Y') . ' የግብር አስተዳደር ስርዓት' : 'Copyright © ' . date('Y') . ' Tax Management System'; ?>.</strong>
-        <?php echo $lang === 'am' ? 'ሁሉም መብቶች የተጠበቁ ናቸው።' : 'All rights reserved.'; ?>
+        <strong>Copyright &copy; <?php echo date('Y'); ?> Tax Management System.</strong>
+        All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b><?php echo $lang === 'am' ? 'እትም' : 'Version'; ?></b> 1.0.0
+            <b>Version</b> 1.0.0
         </div>
     </footer>
 </div>
@@ -499,18 +504,20 @@ $pageTitle = translate('properties');
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/admin-lte/3.2.0/js/adminlte.min.js"></script>
 
 <script>
 $(function () {
-    // Initialize DataTable with export buttons
+    // Initialize DataTable
     $('.datatable').DataTable({
         "paging": true,
         "lengthChange": true,
@@ -519,18 +526,24 @@ $(function () {
         "info": true,
         "autoWidth": false,
         "responsive": true,
-        "dom": 'Bfrtip',
-        "buttons": [
-            'copy', 'csv', 'excel', 'pdf', 'print'
-        ],
+        "buttons": ['copy', 'csv', 'excel', 'pdf', 'print'],
+        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+               '<"row"<"col-sm-12"tr>>' +
+               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
         "language": {
             <?php if ($lang === 'am'): ?>
-                "lengthMenu": "በገፅ ላይ _MENU_ መዝገቦችን አሳይ",
-                "zeroRecords": "ምንም መዝገቦች አልተገኙም",
-                "info": "ከ _TOTAL_ መዝገቦች ውስጥ _START_ እስከ _END_ ታይቷል",
-                "infoEmpty": "ምንም መዝገቦች የሉም",
-                "infoFiltered": "(ከ _MAX_ መዝገቦች ተጣርቷል)",
+                "decimal": "",
+                "emptyTable": "ምንም ውሂብ የለም",
+                "info": "_TOTAL_ ከ _START_ እስከ _END_ ያሳያል",
+                "infoEmpty": "0 ከ 0 እስከ 0 ያሳያል",
+                "infoFiltered": "(_MAX_ ከጠቅላላ ተጣርቷል)",
+                "infoPostFix": "",
+                "thousands": ",",
+                "lengthMenu": "_MENU_ ግቤቶችን አሳይ",
+                "loadingRecords": "በመጫን ላይ...",
+                "processing": "በማቀነባበር ላይ...",
                 "search": "ፈልግ:",
+                "zeroRecords": "ምንም ተዛማጅ መዝገቦች አልተገኙም",
                 "paginate": {
                     "first": "መጀመሪያ",
                     "last": "መጨረሻ",
@@ -538,31 +551,78 @@ $(function () {
                     "previous": "ቀዳሚ"
                 },
                 "buttons": {
-                    "copy": "ቅዳ",
-                    "csv": "CSV አውርድ",
-                    "excel": "Excel አውርድ",
-                    "pdf": "PDF አውርድ",
+                    "copy": "ቅጂ",
+                    "csv": "CSV",
+                    "excel": "Excel",
+                    "pdf": "PDF",
                     "print": "አትም"
                 }
             <?php endif; ?>
         }
-    });
-    
-    // Initialize Select2
-    $('.select2').select2({
-        theme: 'bootstrap4'
+    }).buttons().container().appendTo('.card-tools');
+
+    // Initialize Select2 for modal
+    function initializeModalSelect2() {
+        $('.select2-modal').select2({
+            theme: 'bootstrap4',
+            dropdownParent: $('#propertyModal')
+        });
+    }
+
+    // Call Select2 initialization when modal is shown
+    $('#propertyModal').on('shown.bs.modal', function () {
+        initializeModalSelect2();
     });
 
-    // Form submission confirmation
-    $('#propertyForm').on('submit', function(e) {
-        <?php if ($lang === 'am'): ?>
-            return confirm('ይህን ቅጽ ማስገባት ወይም ማዘመን እንደሚፈልጉ እርግጠኛ ነዎት?');
-        <?php else: ?>
-            return confirm('Are you sure you want to submit or update this form?');
-        <?php endif; ?>
+    // Reset form and Select2 when modal is hidden
+    $('#propertyModal').on('hidden.bs.modal', function () {
+        $('#propertyForm')[0].reset();
+        $('.select2-modal').val('').trigger('change');
+        $('#edit_id').val('');
+        $('#submitProperty').text('<?php echo translate('submit'); ?>');
+        $('#propertyModalLabel').text('<?php echo translate('add_new_property'); ?>');
+    });
+
+    // Handle modal show for create/edit
+    $('#propertyModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var mode = button.data('mode');
+        var modal = $(this);
+
+        if (mode === 'create') {
+            modal.find('.modal-title').text('<?php echo translate('add_new_property'); ?>');
+            modal.find('#submitProperty').text('<?php echo translate('submit'); ?>');
+            modal.find('#propertyForm')[0].reset();
+            modal.find('#modal_owner_id').val('').trigger('change');
+            modal.find('#modal_type_id').val('').trigger('change');
+            modal.find('#modal_tax_status').val('').trigger('change');
+            modal.find('#edit_id').val('');
+        } else if (mode === 'edit') {
+            modal.find('.modal-title').text('<?php echo translate('edit_property'); ?>');
+            modal.find('#submitProperty').text('<?php echo translate('update'); ?>');
+
+            var propertyId = button.data('id');
+            $('#edit_id').val(propertyId);
+            $('#modal_owner_id').val(button.data('owner-id')).trigger('change');
+            $('#modal_type_id').val(button.data('type-id')).trigger('change');
+            $('#modal_property_name').val(button.data('property-name'));
+            $('#modal_address').val(button.data('address'));
+            $('#modal_area').val(button.data('area'));
+            $('#modal_registration_number').val(button.data('registration-number'));
+            $('#modal_construction_year').val(button.data('construction-year'));
+            $('#modal_valuation').val(button.data('valuation'));
+            $('#modal_zoning').val(button.data('zoning'));
+            $('#modal_registration_date').val(button.data('registration-date'));
+            $('#modal_tax_status').val(button.data('tax-status')).trigger('change');
+        }
+    });
+
+    // Handle delete button click
+    $('.delete-property').on('click', function() {
+        var propertyId = $(this).data('id');
+        $('#deleteConfirm').attr('href', 'process_property.php?delete=' + propertyId + '&csrf_token=<?php echo $_SESSION['csrf_token']; ?>');
     });
 });
 </script>
 </body>
 </html>
-<?php  ?>
