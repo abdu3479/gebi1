@@ -13,15 +13,15 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 // Handle language change
-if (isset($_POST['lang'])) {
-    $_SESSION['lang'] = ($_POST['lang'] === 'am') ? 'am' : 'en';
+if (isset($_POST['lang']) && in_array($_POST['lang'], ['en', 'am'])) {
+    $_SESSION['lang'] = $_POST['lang'];
     $redirectUrl = 'rent_contracts.php';
     
     $params = [];
-    if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+    if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0) {
         $params['edit'] = (int)$_GET['edit'];
     }
-    if (isset($_GET['room']) && is_numeric($_GET['room'])) {
+    if (isset($_GET['room']) && is_numeric($_GET['room']) && $_GET['room'] > 0) {
         $params['room'] = (int)$_GET['room'];
     }
     if (isset($_GET['status']) && in_array($_GET['status'], ['pending', 'active', 'terminated', 'completed'])) {
@@ -38,10 +38,11 @@ if (isset($_POST['lang'])) {
 // Ensure user is authenticated and has required role
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
-    $_SESSION['error_message'] = translate('unauthorized_access');
+    $_SESSION['error_messages'][] = translate('unauthorized_access');
     redirect('dashboard.php');
 }
 
+// Initialize database connection
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -49,7 +50,7 @@ try {
     // Update contract statuses based on dates
     updateContractStatuses($conn);
 } catch (Exception $e) {
-    $_SESSION['error_message'] = translate('database_error') . ": " . sanitize($e->getMessage());
+    $_SESSION['error_messages'][] = translate('database_error') . ": " . sanitize($e->getMessage());
     redirect('dashboard.php');
 }
 
@@ -60,7 +61,7 @@ $is_viewer = $role === 'viewer';
 
 // Fetch contract data for editing
 $editContract = [];
-if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0) {
     $editId = (int)$_GET['edit'];
     try {
         $stmt = $conn->prepare("SELECT * FROM rent_contracts WHERE contract_id = ?");
@@ -71,11 +72,11 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         $stmt->close();
         
         if (!$editContract) {
-            $_SESSION['error_message'] = translate('contract_not_found');
+            $_SESSION['error_messages'][] = translate('contract_not_found');
             redirect('rent_contracts.php');
         }
     } catch (Exception $e) {
-        $_SESSION['error_message'] = translate('error_fetching_contract') . ": " . sanitize($e->getMessage());
+        $_SESSION['error_messages'][] = translate('error_fetching_contract') . ": " . sanitize($e->getMessage());
         redirect('rent_contracts.php');
     }
 }
@@ -106,6 +107,7 @@ $pageTitle = translate('rent_contracts');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo translate('tax_management_system') . ' - ' . sanitize($pageTitle); ?></title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap4.min.css">
@@ -121,8 +123,11 @@ $pageTitle = translate('rent_contracts');
             height: calc(2.25rem + 2px);
             padding: 0.375rem 0.75rem;
         }
-        body {
-            font-family: 'Source Sans Pro', sans-serif;
+        body, input, select, textarea, .datatable {
+            font-family: 'Noto Sans Ethiopic', 'Source Sans Pro', sans-serif;
+        }
+        .modal-lg {
+            max-width: 800px;
         }
         .btn-sm {
             padding: 0.25rem 0.5rem;
@@ -137,6 +142,7 @@ $pageTitle = translate('rent_contracts');
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
+    <!-- Main Header -->
     <nav class="main-header navbar navbar-expand navbar-white navbar-light">
         <ul class="navbar-nav">
             <li class="nav-item">
@@ -145,8 +151,8 @@ $pageTitle = translate('rent_contracts');
                 </a>
             </li>
         </ul>
-        
         <ul class="navbar-nav ml-auto">
+            <!-- Language Dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('language'); ?>">
                     <i class="fas fa-globe"></i> <?php echo $lang === 'am' ? 'አማርኛ' : 'English'; ?>
@@ -158,7 +164,7 @@ $pageTitle = translate('rent_contracts');
                     </form>
                 </div>
             </li>
-            
+            <!-- Notifications Dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('notifications'); ?>">
                     <i class="far fa-bell"></i>
@@ -176,7 +182,7 @@ $pageTitle = translate('rent_contracts');
                     <a href="assessments.php" class="dropdown-item dropdown-footer"><?php echo translate('see_all_notifications'); ?></a>
                 </div>
             </li>
-            
+            <!-- User Menu Dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#" aria-label="<?php echo translate('user_menu'); ?>">
                     <i class="far fa-user"></i>
@@ -186,7 +192,7 @@ $pageTitle = translate('rent_contracts');
                     <span class="dropdown-item dropdown-header"><?php echo translate('user_menu'); ?></span>
                     <div class="dropdown-divider"></div>
                     <a href="profile.php" class="dropdown-item">
-                        <i class="fas fa-user mr-2"></i> <?php echo translate('profile'); ?>
+                        <i class="fas fa-user mr-2"></i> <?php echo translate('profile'); ?></a>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="logout.php" class="dropdown-item">
@@ -197,10 +203,11 @@ $pageTitle = translate('rent_contracts');
         </ul>
     </nav>
 
+    <!-- Main Sidebar -->
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <a href="dashboard.php" class="brand-link">
             <img src="../assets/images/logo.jpg" alt="<?php echo translate('tax_system_logo'); ?>" class="brand-image img-circle elevation-3" style="opacity: .8">
-            <span class="brand-text font-weight-light"><?php echo translate('PMTS'); ?></span>
+            <span class="brand-text font-weight-light"><?php echo $lang === 'am' ? 'የግብር አስተዳደር' : 'Tax Management'; ?></span>
         </a>
         <div class="sidebar">
             <div class="user-panel mt-3 pb-3 mb-3 d-flex">
@@ -246,9 +253,21 @@ $pageTitle = translate('rent_contracts');
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="room_types.php" class="nav-link">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <p><?php echo translate('room_types'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="rent_contracts.php" class="nav-link active">
                                 <i class="nav-icon fas fa-file-contract"></i>
                                 <p><?php echo translate('rent_contracts'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="vacancy_reports.php" class="nav-link">
+                                <i class="nav-icon fas fa-chart-pie"></i>
+                                <p><?php echo translate('vacancy_reports'); ?></p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -289,12 +308,13 @@ $pageTitle = translate('rent_contracts');
         </div>
     </aside>
 
+    <!-- Content Wrapper -->
     <div class="content-wrapper">
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1><?php echo translate('rent_contract'); ?></h1>
+                        <h1><?php echo translate('rent_contracts'); ?></h1>
                     </div>
                     <div class="col-sm-6">
                         <ol class="breadcrumb float-sm-right">
@@ -308,113 +328,22 @@ $pageTitle = translate('rent_contracts');
 
         <section class="content">
             <div class="container-fluid">
+                <!-- Display Session Messages -->
                 <?php displayMessages(); ?>
                 
                 <div class="row">
-                    <div class="col-md-4">
-                        <div class="card card-primary">
-                            <div class="card-header">
-                                <h3 class="card-title"><?php echo isset($_GET['edit']) ? translate('edit_contract') : translate('new_contract'); ?></h3>
-                            </div>
-                            <form method="post" action="process_rent_contract.php">
-                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                <?php if (isset($_GET['edit'])): ?>
-                                <input type="hidden" name="edit_id" value="<?php echo (int)$_GET['edit']; ?>">
-                                <?php endif; ?>
-                                <div class="card-body">
-                                    <div class="form-group">
-                                        <label for="room_id"><?php echo translate('room'); ?>*</label>
-                                        <select class="form-control select2" id="room_id" name="room_id" required>
-                                            <option value=""><?php echo translate('select_room'); ?></option>
-                                            <?php
-                                            try {
-                                                $sql = "SELECT r.room_id, r.room_number, b.building_name, p.property_name 
-                                                        FROM rooms r
-                                                        JOIN buildings b ON r.building_id = b.building_id
-                                                        JOIN properties p ON b.property_id = p.property_id";
-                                                if (!isset($_GET['edit'])) {
-                                                    $sql .= " WHERE r.is_occupied = 0";
-                                                } else {
-                                                    $sql .= " WHERE r.is_occupied = 0 OR r.room_id = ?";
-                                                }
-                                                $sql .= " ORDER BY p.property_name, b.building_name, r.room_number";
-                                                $stmt = $conn->prepare($sql);
-                                                if (isset($_GET['edit'])) {
-                                                    $stmt->bind_param("i", $editContract['room_id']);
-                                                }
-                                                $stmt->execute();
-                                                $result = $stmt->get_result();
-                                                
-                                                while ($row = $result->fetch_assoc()):
-                                                    $selected = (isset($editContract['room_id']) && $editContract['room_id'] == $row['room_id']) ? 'selected' : '';
-                                                    ?>
-                                                    <option value="<?php echo (int)$row['room_id']; ?>" <?php echo $selected; ?>>
-                                                        <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?> - <?php echo translate('room'); ?> <?php echo sanitize($row['room_number']); ?>
-                                                    </option>
-                                                <?php endwhile; 
-                                                $stmt->close();
-                                            } catch (Exception $e) {
-                                                $_SESSION['error_messages'][] = translate('error_fetching_rooms') . ": " . sanitize($e->getMessage());
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="tenant_name"><?php echo translate('tenant_name'); ?>*</label>
-                                        <input type="text" class="form-control" id="tenant_name" name="tenant_name" required 
-                                               value="<?php echo isset($editContract['tenant_name']) ? sanitize($editContract['tenant_name']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="tenant_phone"><?php echo translate('tenant_phone'); ?></label>
-                                        <input type="text" class="form-control" id="tenant_phone" name="tenant_phone" 
-                                               value="<?php echo isset($editContract['tenant_phone']) ? sanitize($editContract['tenant_phone']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="tenant_id_number"><?php echo translate('tenant_id_number'); ?></label>
-                                        <input type="text" class="form-control" id="tenant_id_number" name="tenant_id_number" 
-                                               value="<?php echo isset($editContract['tenant_id_number']) ? sanitize($editContract['tenant_id_number']) : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="start_date"><?php echo translate('start_date'); ?>*</label>
-                                        <input type="date" class="form-control" id="start_date" name="start_date" required 
-                                               value="<?php echo isset($editContract['start_date']) ? sanitize($editContract['start_date']) : date('Y-m-d'); ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="end_date"><?php echo translate('end_date'); ?>*</label>
-                                        <input type="date" class="form-control" id="end_date" name="end_date" required 
-                                               value="<?php echo isset($editContract['end_date']) ? sanitize($editContract['end_date']) : date('Y-m-d', strtotime('+1 year')); ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="monthly_rent"><?php echo translate('monthly_rent'); ?>*</label>
-                                        <input type="number" step="0.01" class="form-control" id="monthly_rent" name="monthly_rent" required 
-                                               value="<?php echo isset($editContract['monthly_rent']) ? number_format((float)$editContract['monthly_rent'], 2, '.', '') : ''; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="deposit_amount"><?php echo translate('deposit_amount'); ?></label>
-                                        <input type="number" step="0.01" class="form-control" id="deposit_amount" name="deposit_amount" 
-                                               value="<?php echo isset($editContract['deposit_amount']) ? number_format((float)$editContract['deposit_amount'], 2, '.', '') : '0'; ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="notes"><?php echo translate('notes'); ?></label>
-                                        <textarea class="form-control" id="notes" name="notes" rows="3"><?php echo isset($editContract['notes']) ? sanitize($editContract['notes']) : ''; ?></textarea>
-                                    </div>
-                                </div>
-                                <div class="card-footer">
-                                    <button type="submit" class="btn btn-primary"><?php echo isset($_GET['edit']) ? translate('update') : translate('submit'); ?></button>
-                                    <?php if (isset($_GET['edit'])): ?>
-                                        <a href="rent_contracts.php" class="btn btn-default"><?php echo translate('cancel'); ?></a>
-                                    <?php endif; ?>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-8">
+                    <!-- Contracts Table -->
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title"><?php echo translate('list_of_rent_contracts'); ?></h3>
                                 <div class="card-tools">
-                                    <form method="get" class="form-inline">
+                                    <?php if (isAdmin() || isOfficer()): ?>
+                                        <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#contractModal" data-mode="create">
+                                            <i class="fas fa-plus"></i> <?php echo translate('new_contract'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    <form method="get" class="form-inline ml-2">
                                         <div class="input-group input-group-sm">
                                             <select class="form-control select2" name="room" onchange="this.form.submit()">
                                                 <option value=""><?php echo translate('all_rooms'); ?></option>
@@ -427,7 +356,6 @@ $pageTitle = translate('rent_contracts');
                                                                            ORDER BY p.property_name, b.building_name, r.room_number");
                                                     $stmt->execute();
                                                     $result = $stmt->get_result();
-                                                    
                                                     while ($row = $result->fetch_assoc()):
                                                         $selected = ($_GET['room'] ?? '') == $row['room_id'] ? 'selected' : '';
                                                         ?>
@@ -486,11 +414,9 @@ $pageTitle = translate('rent_contracts');
                                                 $types .= 'i';
                                             }
                                             
-                                            if (!empty($_GET['status'])) {
-                                                $validStatuses = ['pending', 'active', 'terminated', 'completed'];
-                                                $status = in_array($_GET['status'], $validStatuses) ? $_GET['status'] : 'active';
+                                            if (!empty($_GET['status']) && in_array($_GET['status'], ['pending', 'active', 'terminated', 'completed'])) {
                                                 $sql .= " AND c.status = ?";
-                                                $params[] = $status;
+                                                $params[] = $_GET['status'];
                                                 $types .= 's';
                                             }
                                             
@@ -533,24 +459,48 @@ $pageTitle = translate('rent_contracts');
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <a href="rent_contracts.php?edit=<?php echo (int)$row['contract_id']; ?>" class="btn btn-sm btn-primary" title="<?php echo translate('edit'); ?>">
-                                                            <i class="fas fa-edit"></i>
-                                                        </a>
-                                                        <a href="process_rent_contract.php?delete=<?php echo (int)$row['contract_id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-danger" title="<?php echo translate('delete'); ?>" onclick="return confirm('<?php echo translate('confirm_delete_contract'); ?>');">
-                                                            <i class="fas fa-trash"></i>
-                                                        </a>
-                                                        <?php if ($row['status'] === 'pending' && $is_future): ?>
-                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('approve'); ?>">
-                                                                <i class="fas fa-check"></i>
-                                                            </a>
-                                                        <?php elseif ($row['status'] === 'active' && $is_current): ?>
-                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=terminated&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-warning" title="<?php echo translate('terminate'); ?>" onclick="return confirm('<?php echo translate('confirm_terminate_contract'); ?>');">
-                                                                <i class="fas fa-times"></i>
-                                                            </a>
-                                                        <?php elseif ($row['status'] === 'terminated' && $is_current): ?>
-                                                            <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('activate'); ?>">
-                                                                <i class="fas fa-check"></i>
-                                                            </a>
+                                                        <?php if (isAdmin() || isOfficer()): ?>
+                                                            <button class="btn btn-sm btn-primary edit-contract" 
+                                                                    data-mode="edit"
+                                                                    data-id="<?php echo (int)$row['contract_id']; ?>"
+                                                                    data-room-id="<?php echo (int)$row['room_id']; ?>"
+                                                                    data-tenant-name="<?php echo htmlspecialchars(sanitize($row['tenant_name'])); ?>"
+                                                                    data-tenant-phone="<?php echo htmlspecialchars(sanitize($row['tenant_phone'] ?? '')); ?>"
+                                                                    data-tenant-id-number="<?php echo htmlspecialchars(sanitize($row['tenant_id_number'] ?? '')); ?>"
+                                                                    data-start-date="<?php echo htmlspecialchars(sanitize($row['start_date'])); ?>"
+                                                                    data-end-date="<?php echo htmlspecialchars(sanitize($row['end_date'])); ?>"
+                                                                    data-monthly-rent="<?php echo number_format((float)$row['monthly_rent'], 2, '.', ''); ?>"
+                                                                    data-deposit-amount="<?php echo number_format((float)$row['deposit_amount'], 2, '.', ''); ?>"
+                                                                    data-notes="<?php echo htmlspecialchars(sanitize($row['notes'] ?? '')); ?>"
+                                                                    data-toggle="modal"
+                                                                    data-target="#contractModal"
+                                                                    title="<?php echo translate('edit'); ?>">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-danger delete-contract" 
+                                                                    data-id="<?php echo (int)$row['contract_id']; ?>"
+                                                                    data-toggle="modal"
+                                                                    data-target="#deleteModal"
+                                                                    title="<?php echo translate('delete'); ?>">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                            <?php if ($row['status'] === 'pending' && $is_future): ?>
+                                                                <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('approve'); ?>">
+                                                                    <i class="fas fa-check"></i>
+                                                                </a>
+                                                            <?php elseif ($row['status'] === 'active' && $is_current): ?>
+                                                                <button class="btn btn-sm btn-warning terminate-contract" 
+                                                                        data-id="<?php echo (int)$row['contract_id']; ?>"
+                                                                        data-toggle="modal"
+                                                                        data-target="#terminateModal"
+                                                                        title="<?php echo translate('terminate'); ?>">
+                                                                    <i class="fas fa-times"></i>
+                                                                </button>
+                                                            <?php elseif ($row['status'] === 'terminated' && $is_current): ?>
+                                                                <a href="process_rent_contract.php?change_status=<?php echo (int)$row['contract_id']; ?>&new_status=active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('activate'); ?>">
+                                                                    <i class="fas fa-check"></i>
+                                                                </a>
+                                                            <?php endif; ?>
                                                         <?php endif; ?>
                                                         <a href="rental_payments.php?contract=<?php echo (int)$row['contract_id']; ?>" class="btn btn-sm btn-info" title="<?php echo translate('view_payments'); ?>">
                                                             <i class="fas fa-file-invoice-dollar"></i>
@@ -572,10 +522,150 @@ $pageTitle = translate('rent_contracts');
                         </div>
                     </div>
                 </div>
+
+                <!-- Contract Modal -->
+                <div class="modal fade" id="contractModal" tabindex="-1" role="dialog" aria-labelledby="contractModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="contractModalLabel"><?php echo translate('new_contract'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                            <form method="post" action="process_rent_contract.php" id="contractForm">
+                                <div class="modal-body">
+                                    <input type="hidden" name="edit_id" id="edit_id">
+                                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="room_id"><?php echo translate('room'); ?>*</label>
+                                                <select class="form-control select2" id="room_id" name="room_id" required>
+                                                    <option value=""><?php echo translate('select_room'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $sql = "SELECT r.room_id, r.room_number, b.building_name, p.property_name 
+                                                                FROM rooms r
+                                                                JOIN buildings b ON r.building_id = b.building_id
+                                                                JOIN properties p ON b.property_id = p.property_id";
+                                                        if (!isset($_GET['edit'])) {
+                                                            $sql .= " WHERE r.is_occupied = 0";
+                                                        } else {
+                                                            $sql .= " WHERE r.is_occupied = 0 OR r.room_id = ?";
+                                                        }
+                                                        $sql .= " ORDER BY p.property_name, b.building_name, r.room_number";
+                                                        $stmt = $conn->prepare($sql);
+                                                        if (isset($_GET['edit'])) {
+                                                            $stmt->bind_param("i", $editContract['room_id']);
+                                                        }
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                            ?>
+                                                            <option value="<?php echo (int)$row['room_id']; ?>">
+                                                                <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?> - <?php echo translate('room'); ?> <?php echo sanitize($row['room_number']); ?>
+                                                            </option>
+                                                        <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'][] = translate('error_fetching_rooms') . ": " . sanitize($e->getMessage());
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tenant_name"><?php echo translate('tenant_name'); ?>*</label>
+                                                <input type="text" class="form-control" id="tenant_name" name="tenant_name" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tenant_phone"><?php echo translate('tenant_phone'); ?></label>
+                                                <input type="text" class="form-control" id="tenant_phone" name="tenant_phone">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tenant_id_number"><?php echo translate('tenant_id_number'); ?></label>
+                                                <input type="text" class="form-control" id="tenant_id_number" name="tenant_id_number">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="start_date"><?php echo translate('start_date'); ?>*</label>
+                                                <input type="date" class="form-control" id="start_date" name="start_date" required value="<?php echo date('Y-m-d'); ?>">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="end_date"><?php echo translate('end_date'); ?>*</label>
+                                                <input type="date" class="form-control" id="end_date" name="end_date" required value="<?php echo date('Y-m-d', strtotime('+1 year')); ?>">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="monthly_rent"><?php echo translate('monthly_rent'); ?>*</label>
+                                                <input type="number" step="0.01" min="0" class="form-control" id="monthly_rent" name="monthly_rent" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="deposit_amount"><?php echo translate('deposit_amount'); ?></label>
+                                                <input type="number" step="0.01" min="0" class="form-control" id="deposit_amount" name="deposit_amount" value="0">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="notes"><?php echo translate('notes'); ?></label>
+                                                <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('close'); ?></button>
+                                    <button type="submit" class="btn btn-primary" id="submitContract"><?php echo translate('submit'); ?></button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Modal -->
+                <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deleteModalLabel"><?php echo translate('confirm_delete'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <?php echo translate('confirm_delete_contract'); ?>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('cancel'); ?></button>
+                                <a href="#" id="deleteConfirm" class="btn btn-danger"><?php echo translate('delete'); ?></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terminate Confirmation Modal -->
+                <div class="modal fade" id="terminateModal" tabindex="-1" role="dialog" aria-labelledby="terminateModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="terminateModalLabel"><?php echo translate('confirm_terminate'); ?></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <?php echo translate('confirm_terminate_contract'); ?>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('cancel'); ?></button>
+                                <a href="#" id="terminateConfirm" class="btn btn-warning"><?php echo translate('terminate'); ?></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 
+    <!-- Main Footer -->
     <footer class="main-footer">
         <strong><?php echo $lang === 'am' ? 'የቅጂ መብት © ' . date('Y') . ' የግብር አስተዳደር ስርዓት' : 'Copyright © ' . date('Y') . ' Tax Management System'; ?>.</strong>
         <?php echo $lang === 'am' ? 'ሁሉም መብቶች የተጠበቁ ናቸው።' : 'All rights reserved.'; ?>
@@ -590,18 +680,19 @@ $pageTitle = translate('rent_contracts');
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/admin-lte/3.2.0/js/adminlte.min.js"></script>
 
 <script>
 $(function () {
+    // Initialize DataTable with export buttons
     $('.datatable').DataTable({
         "paging": true,
         "lengthChange": true,
@@ -610,18 +701,24 @@ $(function () {
         "info": true,
         "autoWidth": false,
         "responsive": true,
-        "dom": 'Bfrtip',
-        "buttons": [
-            'copy', 'csv', 'excel', 'pdf', 'print'
-        ],
+        "buttons": ['copy', 'csv', 'excel', 'pdf', 'print'],
+        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+               '<"row"<"col-sm-12"tr>>' +
+               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
         "language": {
             <?php if ($lang === 'am'): ?>
-                "lengthMenu": "በገፅ ላይ _MENU_ መዝገቦችን አሳይ",
-                "zeroRecords": "ምንም መዝገቦች አልተገኙም",
-                "info": "ከ _TOTAL_ መዝገቦች ውስጥ _START_ እስከ _END_ ታይቷል",
-                "infoEmpty": "ምንም መዝገቦች የሉም",
-                "infoFiltered": "(ከ _MAX_ መዝገቦች ተጣርቷል)",
+                "decimal": "",
+                "emptyTable": "ምንም ውሂብ የለም",
+                "info": "_TOTAL_ ከ _START_ እስከ _END_ ያሳያል",
+                "infoEmpty": "0 ከ 0 እስከ 0 ያሳያል",
+                "infoFiltered": "(_MAX_ ከጠቅላላ ተጣርቷል)",
+                "infoPostFix": "",
+                "thousands": ",",
+                "lengthMenu": "_MENU_ ግቤቶችን አሳይ",
+                "loadingRecords": "በመጫን ላይ...",
+                "processing": "በማቀነባበር ላይ...",
                 "search": "ፈልግ:",
+                "zeroRecords": "ምንም ተዛማጅ መዝገቦች አልተገኙም",
                 "paginate": {
                     "first": "መጀመሪያ",
                     "last": "መጨረሻ",
@@ -629,23 +726,133 @@ $(function () {
                     "previous": "ቀዳሚ"
                 },
                 "buttons": {
-                    "copy": "ቅዳ",
-                    "csv": "CSV አውርድ",
-                    "excel": "Excel አውርድ",
-                    "pdf": "PDF አውርድ",
+                    "copy": "ቅጂ",
+                    "csv": "CSV",
+                    "excel": "Excel",
+                    "pdf": "PDF",
                     "print": "አትም"
                 }
             <?php endif; ?>
         }
-    });
-    
+    }).buttons().container().appendTo('.card-tools');
+
+    // Initialize Select2
     $('.select2').select2({
         theme: 'bootstrap4'
     });
 
-    $('form').on('submit', function() {
-        return confirm('<?php echo $lang === 'am' ? 'ይህን ቅጽ ማስገባት ወይም ማዘመን እንደሚፈልጉ እርግጠኛ ነዎት?' : 'Are you sure you want to submit or update this form?'; ?>');
+    // Reset form when modal is hidden
+    $('#contractModal').on('hidden.bs.modal', function () {
+        $('#contractForm')[0].reset();
+        $('#edit_id').val('');
+        $('#start_date').val('<?php echo date('Y-m-d'); ?>');
+        $('#end_date').val('<?php echo date('Y-m-d', strtotime('+1 year')); ?>');
+        $('#deposit_amount').val('0');
+        $('#submitContract').text('<?php echo translate('submit'); ?>');
+        $('#contractModalLabel').text('<?php echo translate('new_contract'); ?>');
+        $('#room_id').val('').trigger('change');
     });
+
+    // Handle modal show for create/edit
+    $('#contractModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var mode = button.data('mode');
+        var modal = $(this);
+
+        if (mode === 'create') {
+            modal.find('.modal-title').text('<?php echo translate('new_contract'); ?>');
+            modal.find('#submitContract').text('<?php echo translate('submit'); ?>');
+            modal.find('#contractForm')[0].reset();
+            modal.find('#edit_id').val('');
+            modal.find('#start_date').val('<?php echo date('Y-m-d'); ?>');
+            modal.find('#end_date').val('<?php echo date('Y-m-d', strtotime('+1 year')); ?>');
+            modal.find('#deposit_amount').val('0');
+            modal.find('#room_id').val('').trigger('change');
+        } else if (mode === 'edit') {
+            modal.find('.modal-title').text('<?php echo translate('edit_contract'); ?>');
+            modal.find('#submitContract').text('<?php echo translate('update'); ?>');
+
+            var contractId = button.data('id');
+            $('#edit_id').val(contractId);
+            $('#room_id').val(button.data('room-id')).trigger('change');
+            $('#tenant_name').val(button.data('tenant-name'));
+            $('#tenant_phone').val(button.data('tenant-phone'));
+            $('#tenant_id_number').val(button.data('tenant-id-number'));
+            $('#start_date').val(button.data('start-date'));
+            $('#end_date').val(button.data('end-date'));
+            $('#monthly_rent').val(button.data('monthly-rent'));
+            $('#deposit_amount').val(button.data('deposit-amount'));
+            $('#notes').val(button.data('notes'));
+        }
+    });
+
+    // Handle delete button click
+    $('.delete-contract').on('click', function() {
+        var contractId = $(this).data('id');
+        $('#deleteConfirm').attr('href', 'process_rent_contract.php?delete=' + contractId + '&csrf_token=<?php echo $_SESSION['csrf_token']; ?>');
+    });
+
+    // Handle terminate button click
+    $('.terminate-contract').on('click', function () {
+        var contractId = $(this).data('id');
+        $('#terminateConfirm').attr('contract-id', contractId);
+        $('#terminateConfirm').attr('href', 'process_rent_contract.php?change_status=' + contractId + '&new_status=terminated&csrf_token=' + contractId);
+    });
+
+    // Client-side form validation for dates and amounts
+    $('#contractForm').on('submit', function(e) {
+        var startDate = new Date($('#start_date').val());
+        var endDate = new Date($('#end_date').val());
+        var monthlyRent = parseFloat($('#monthly_rent').val()) || 0;
+        var depositAmount = parseFloat($('#deposit_amount').val()) || 0;
+
+        if (endDate <= startDate) {
+            e.preventDefault();
+            alert('<?php echo translate('end_date_must_be_after_start_date'); ?>');
+            $('#end_date').focus();
+            return false;
+        }
+
+        if (monthlyRent < 0) {
+            e.preventDefault();
+            alert('<?php echo translate('monthly_rent_must_be_positive'); ?>');
+            $('#monthly_rent').focus();
+            return false;
+        }
+
+        if (depositAmount < 0) {
+            e.preventDefault();
+            alert('<?php echo translate('deposit_amount_must_be_positive'); ?>');
+            $('#deposit_amount').focus();
+        return false;
+        }
+
+        return true;
+    });
+
+    // Auto-open modal for edit mode on page load
+    <?php if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0): ?>
+    $(document).ready(function() {
+        $('#contractModal').modal('show');
+        $('#contractModal').trigger('show.bs.modal', {
+            relatedTarget: {
+                dataset: {
+                    mode: 'edit',
+                    id: <?php echo (int)$editId; ?>,
+                    roomId: <?php echo (int)$editContract['room_id']; ?>,
+                    tenantName: '<?php echo htmlspecialchars(sanitize($editContract['tenant_name'])); ?>',
+                    tenantPhone: '<?php echo htmlspecialchars(sanitize($editContract['tenant_phone'] ?? '')); ?>',
+                    tenantIdNumber: '<?php echo htmlspecialchars(sanitize($editContract['tenant_id_number'] ?? '')); ?>',
+                    startDate: '<?php echo htmlspecialchars(sanitize($editContract['start_date'])); ?>',
+                    endDate: '<?php echo htmlspecialchars(sanitize($editContract['end_date'])); ?>',
+                    monthlyRent: '<?php echo number_format((float)$editContract['monthly_rent'], 2, '.', ''); ?>',
+                    depositAmount: '<?php echo number_format((float)$editContract['deposit_amount'], 2, '.', ''); ?>',
+                    notes: '<?php echo htmlspecialchars(sanitize($editContract['notes'] ?? '')); ?>'
+                }
+            });
+        });
+    });
+    <?php endif; ?>
 });
 </script>
 </body>
