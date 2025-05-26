@@ -1,21 +1,17 @@
 <?php
+session_start();
 require_once '../config/database.php';
 require_once 'includes/helpers.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 // Generate CSRF token if not set
 if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
 }
 
-// Ensure user is authenticated and has required role
+// Ensure user is authenticated
 ensureAuthenticated();
 if (!isAdmin() && !isOfficer()) {
-    $_SESSION['error_messages'][] = translate('unauthorized_access');
+    $_SESSION['error_messages'] = [translate('unauthorized_access')];
     redirect('index.php');
 }
 
@@ -39,7 +35,7 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
 } catch (Exception $e) {
-    $_SESSION['error_messages'][] = "Database connection failed: " . sanitize($e->getMessage());
+    $_SESSION['error_messages'] = ["Database connection failed: " . sanitize($e->getMessage())];
     redirect('index.php');
 }
 
@@ -53,18 +49,20 @@ $editRoom = [];
 if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0) {
     $editId = (int)$_GET['edit'];
     try {
-        $stmt = $conn->prepare("SELECT * FROM rooms WHERE room_id = ?");
+        $stmt = $conn->prepare("SELECT r.*, t.id AS taxpayer_id, t.business_name, t.tin, t.taxpayer_category 
+                                FROM rooms r 
+                                LEFT JOIN taxpayers t ON r.taxpayer_id = t.id 
+                                WHERE r.id = ?");
         $stmt->bind_param("i", $editId);
         $stmt->execute();
-        $result = $stmt->get_result();
-        $editRoom = $result->fetch_assoc();
+        $editRoom = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         if (!$editRoom) {
-            $_SESSION['error_messages'][] = translate('room_not_found');
+            $_SESSION['error_messages'] = [translate('room_not_found')];
             redirect('rooms.php');
         }
     } catch (Exception $e) {
-        $_SESSION['error_messages'][] = "Error fetching room: " . sanitize($e->getMessage());
+        $_SESSION['error_messages'] = ["Error fetching room: " . sanitize($e->getMessage())];
         redirect('rooms.php');
     }
 }
@@ -77,12 +75,10 @@ if (!$is_viewer) {
         $status = 'pending';
         $stmt->bind_param("s", $status);
         $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $notificationsCount = (int)$row['count'];
+        $notificationsCount = (int)$stmt->get_result()->fetch_assoc()['count'];
         $stmt->close();
     } catch (Exception $e) {
-        $_SESSION['error_messages'][] = "Error fetching notifications: " . sanitize($e->getMessage());
+        $_SESSION['error_messages'] = ["Error fetching notifications: " . sanitize($e->getMessage())];
     }
 }
 
@@ -104,19 +100,10 @@ $pageTitle = translate('rooms');
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2-bootstrap-theme/0.1.0-beta.10/select2-bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/admin-lte/3.2.0/css/adminlte.min.css">
     <style>
-        .main-header .navbar-nav .nav-item .nav-link {
-            padding: 0.5rem 1rem;
-        }
-        .select2-container--default .select2-selection--single {
-            height: calc(2.25rem + 2px);
-            padding: 0.375rem 0.75rem;
-        }
-        body, input, select, textarea, .datatable {
-            font-family: 'Noto Sans Ethiopic', 'Source Sans Pro', sans-serif;
-        }
-        .modal-lg {
-            max-width: 800px;
-        }
+        .main-header .navbar-nav .nav-item .nav-link { padding: 0.5rem 1rem; }
+        .select2-container--default .select2-selection--single { height: calc(2.25rem + 2px); padding: 0.375rem 0.75rem; }
+        body, input, select, textarea, .datatable { font-family: 'Noto Sans Ethiopic', 'Source Sans Pro', sans-serif; }
+        .modal-lg { max-width: 800px; }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
@@ -230,9 +217,21 @@ $pageTitle = translate('rooms');
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="room_types.php" class="nav-link">
-                                <i class="nav-icon fas fa-tags"></i>
-                                <p><?php echo translate('room_types'); ?></p>
+                            <a href="taxpayers.php" class="nav-link">
+                                <i class="nav-icon fas fa-user-tie"></i>
+                                <p><?php echo translate('taxpayers'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="goods.php" class="nav-link">
+                                <i class="nav-icon fas fa-box"></i>
+                                <p><?php echo translate('goods'); ?></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="transactions.php" class="nav-link">
+                                <i class="nav-icon fas fa-exchange-alt"></i>
+                                <p><?php echo translate('transactions'); ?></p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -254,9 +253,9 @@ $pageTitle = translate('rooms');
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="payments.php" class="nav-link">
-                                <i class="nav-icon fas fa-money-bill-wave"></i>
-                                <p><?php echo translate('payments'); ?></p>
+                            <a href="tax_report.php" class="nav-link">
+                                <i class="nav-icon fas fa-file-invoice"></i>
+                                <p><?php echo translate('annual_tax_report'); ?></p>
                             </a>
                         </li>
                     <?php endif; ?>
@@ -317,7 +316,7 @@ $pageTitle = translate('rooms');
                                 <div class="card-tools">
                                     <?php if (isAdmin() || isOfficer()): ?>
                                         <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#roomModal" data-mode="create">
-                                            <i class="fas fa-plus"></i> <?php echo translate('add_new_room'); ?>
+                                            <i class="fas fa-plus"></i> <?php echo translate('add_room'); ?>
                                         </button>
                                     <?php endif; ?>
                                     <form method="get" class="form-inline ml-2">
@@ -326,23 +325,22 @@ $pageTitle = translate('rooms');
                                                 <option value=""><?php echo translate('all_buildings'); ?></option>
                                                 <?php
                                                 try {
-                                                    $stmt = $conn->prepare("SELECT b.building_id, b.building_name, p.property_name 
+                                                    $stmt = $conn->prepare("SELECT b.id, b.name, b.location 
                                                                            FROM buildings b
-                                                                           JOIN properties p ON b.property_id = p.property_id
-                                                                           ORDER BY p.property_name, b.building_name");
+                                                                           ORDER BY b.name");
                                                     $stmt->execute();
                                                     $result = $stmt->get_result();
                                                     $selectedBuildingId = (isset($_GET['building_id']) && is_numeric($_GET['building_id']) && $_GET['building_id'] > 0) ? (int)$_GET['building_id'] : '';
                                                     while ($row = $result->fetch_assoc()):
-                                                        $selected = ($selectedBuildingId == $row['building_id']) ? 'selected' : '';
+                                                        $selected = ($selectedBuildingId == $row['id']) ? 'selected' : '';
                                                 ?>
-                                                    <option value="<?php echo (int)$row['building_id']; ?>" <?php echo $selected; ?>>
-                                                        <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?>
+                                                    <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
+                                                        <?php echo sanitize($row['name']); ?> - <?php echo sanitize($row['location']); ?>
                                                     </option>
                                                 <?php endwhile; 
                                                     $stmt->close();
                                                 } catch (Exception $e) {
-                                                    $_SESSION['error_messages'][] = "Error fetching buildings: " . sanitize($e->getMessage());
+                                                    $_SESSION['error_messages'] = ["Error fetching buildings: " . sanitize($e->getMessage())];
                                                 }
                                                 ?>
                                             </select>
@@ -363,11 +361,13 @@ $pageTitle = translate('rooms');
                                         <tr>
                                             <th><?php echo translate('id'); ?></th>
                                             <th><?php echo translate('room_number'); ?></th>
-                                            <th><?php echo translate('building_property'); ?></th>
+                                            <th><?php echo translate('building'); ?></th>
+                                            <th><?php echo translate('taxpayer'); ?></th>
                                             <th><?php echo translate('floor'); ?></th>
                                             <th><?php echo translate('type'); ?></th>
                                             <th><?php echo translate('area'); ?></th>
                                             <th><?php echo translate('rent'); ?></th>
+                                            <th><?php echo translate('tax'); ?></th>
                                             <th><?php echo translate('status'); ?></th>
                                             <th><?php echo translate('actions'); ?></th>
                                         </tr>
@@ -375,11 +375,13 @@ $pageTitle = translate('rooms');
                                     <tbody>
                                         <?php
                                         try {
-                                            $sql = "SELECT r.*, rt.type_name, b.building_name, p.property_name 
+                                            $sql = "SELECT r.id, r.room_number, r.floor_number, r.area, r.monthly_rent, r.tax_rate, r.tax_amount, r.is_occupied, 
+                                                    b.name AS building_name, rt.name AS type_name, 
+                                                    t.business_name, t.tin, t.taxpayer_category
                                                     FROM rooms r
-                                                    JOIN room_types rt ON r.type_id = rt.type_id
-                                                    JOIN buildings b ON r.building_id = b.building_id
-                                                    JOIN properties p ON b.property_id = p.property_id
+                                                    JOIN buildings b ON r.building_id = b.id
+                                                    JOIN room_types rt ON r.type_id = rt.id
+                                                    LEFT JOIN taxpayers t ON r.taxpayer_id = t.id
                                                     WHERE 1=1";
                                             $params = [];
                                             $types = '';
@@ -396,39 +398,43 @@ $pageTitle = translate('rooms');
                                                 $types .= 'i';
                                             }
                                             
-                                            $sql .= " ORDER BY p.property_name, b.building_name, r.floor_number, r.room_number";
+                                            $sql .= " ORDER BY b.name, r.floor_number, r.room_number";
                                             
                                             $stmt = $conn->prepare($sql);
                                             if (!empty($params)) {
                                                 $stmt->bind_param($types, ...$params);
                                             }
-                                            $stmt->execute();
-                                            $result = $stmt->get_result();
+                                            $stmt->execute()->get_result();
                                             
                                             while ($row = $result->fetch_assoc()):
                                                 $statusClass = $row['is_occupied'] ? 'badge-danger' : 'badge-success';
                                                 $statusText = $row['is_occupied'] ? translate('occupied') : translate('vacant');
+                                                $category = $row['taxpayer_category'] ? ($lang === 'am' ? ($row['taxpayer_category'] === 'A' ? 'ሀ' : ($row['taxpayer_category'] === 'B' ? 'ለ' : 'ሐ')) : $row['taxpayer_category']) : '';
                                         ?>
                                             <tr>
-                                                <td><?php echo (int)$row['room_id']; ?></td>
+                                                <td><?php echo (int)$row['id']; ?></td>
                                                 <td><?php echo sanitize($row['room_number']); ?></td>
-                                                <td><?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?></td>
+                                                <td><?php echo sanitize($row['building_name']); ?></td>
+                                                <td><?php echo $row['business_name'] ? sanitize($row['business_name']) . ' (' . sanitize($row['tin']) . ', ' . $category . ')' : '-'; ?></td>
                                                 <td><?php echo (int)$row['floor_number']; ?></td>
                                                 <td><?php echo sanitize($row['type_name']); ?></td>
-                                                <td><?php echo number_format((float)$row['area'], 2); ?> sqm</td>
+                                                <td><?php echo number_format((float)$row['area'], 2); ?> m²</td>
                                                 <td><?php echo formatCurrency($row['monthly_rent']); ?></td>
-                                                <td><span class="badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
+                                                <td><?php echo formatCurrency($row['tax_amount']); ?></td>
+                                                <td><span class="badge <?php echo $statusClass; ?>">><?php echo $statusText; ?></span></td>
                                                 <td>
                                                     <?php if (isAdmin() || isOfficer()): ?>
                                                         <button class="btn btn-sm btn-primary edit-room" 
                                                                 data-mode="edit"
-                                                                data-id="<?php echo (int)$row['room_id']; ?>"
+                                                                data-id="<?php echo (int)$row['id']; ?>"
                                                                 data-building-id="<?php echo (int)$row['building_id']; ?>"
                                                                 data-type-id="<?php echo (int)$row['type_id']; ?>"
-                                                                data-room-number="<?php echo htmlspecialchars(sanitize($row['room_number'])); ?>"
+                                                                data-taxpayer-id="<?php echo (int)$row['taxpayer_id'] ?? ''; ?>"
+                                                                data-room-number="<?php echo htmlspecialchars($row['room_number']); ?>"
                                                                 data-floor-number="<?php echo (int)$row['floor_number']; ?>"
-                                                                data-area="<?php echo number_format((float)$row['area'], 2, '.', ''); ?>"
-                                                                data-monthly-rent="<?php echo number_format((float)$row['monthly_rent'], 2, '.', ''); ?>"
+                                                                data-area="<?php echo number_format((float)$row['area'], 2); ?>"
+                                                                data-monthly-rent="<?php echo number_format((float)$row['monthly_rent'], 2); ?>"
+                                                                data-tax-rate="<?php echo number_format((float)$row['tax_rate'], 2); ?>"
                                                                 data-is-occupied="<?php echo (int)$row['is_occupied']; ?>"
                                                                 data-toggle="modal"
                                                                 data-target="#roomModal"
@@ -436,17 +442,19 @@ $pageTitle = translate('rooms');
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                         <button class="btn btn-sm btn-danger delete-room" 
-                                                                data-id="<?php echo (int)$row['room_id']; ?>"
+                                                                data-id="<?php echo (int)$row['id']; ?>"
                                                                 data-toggle="modal"
                                                                 data-target="#deleteModal"
                                                                 title="<?php echo translate('delete'); ?>">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     <?php endif; ?>
-                                                    <a href="rent_contracts.php?room=<?php echo (int)$row['room_id']; ?>" class="btn btn-sm btn-info" title="<?php echo translate('view_contracts'); ?>">
-                                                        <i class="fas fa-file-contract"></i>
-                                                    </a>
-                                                    <a href="rental_tax.php?room=<?php echo (int)$row['room_id']; ?>" class="btn btn-sm btn-warning" title="<?php echo translate('tax_assessment'); ?>">
+                                                    <?php if ($row['taxpayer_id']): ?>
+                                                        <a href="transactions.php?room_id=<?php echo (int)$row['id']; ?>" class="btn btn-sm btn-success" title="<?php echo translate('transactions'); ?>">
+                                                            <i class="fas fa-exchange-alt"></i>
+                                                        </a>
+                                                    <?php endif; ?>
+                                                    <a href="rental_tax.php?room_id=<?php echo (int)$row['id']; ?>" class="btn btn-sm btn-warning" title="<?php echo translate('tax_assessment'); ?>">
                                                         <i class="fas fa-file-invoice-dollar"></i>
                                                     </a>
                                                 </td>
@@ -454,7 +462,7 @@ $pageTitle = translate('rooms');
                                         <?php endwhile; 
                                             $stmt->close();
                                         } catch (Exception $e) {
-                                            $_SESSION['error_messages'][] = "Error fetching rooms: " . sanitize($e->getMessage());
+                                            $_SESSION['error_messages'] = ["Error fetching rooms: " . sanitize($e->getMessage())];
                                         }
                                         ?>
                                     </tbody>
@@ -469,12 +477,12 @@ $pageTitle = translate('rooms');
                     <div class="modal-dialog modal-lg" role="document">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="roomModalLabel"><?php echo translate('add_new_room'); ?></h5>
+                                <h5 class="modal-title" id="roomModalLabel"><?php echo translate('add_room'); ?></h5>
                                 <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo translate('close'); ?>">
                                     <span aria-hidden="true">×</span>
                                 </button>
                             </div>
-                            <form method="post" action="process_room.php" id="roomForm">
+                            <form method="post" action="process_rooms.php" id="roomForm">
                                 <div class="modal-body">
                                     <input type="hidden" name="edit_id" id="edit_id">
                                     <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
@@ -486,22 +494,19 @@ $pageTitle = translate('rooms');
                                                     <option value=""><?php echo translate('select_building'); ?></option>
                                                     <?php
                                                     try {
-                                                        $stmt = $conn->prepare("SELECT b.building_id, b.building_name, p.property_name 
-                                                                               FROM buildings b
-                                                                               JOIN properties p ON b.property_id = p.property_id
-                                                                               ORDER BY p.property_name, b.building_name");
+                                                        $stmt = $conn->prepare("SELECT id, name FROM buildings ORDER BY name");
                                                         $stmt->execute();
                                                         $result = $stmt->get_result();
                                                         while ($row = $result->fetch_assoc()):
-                                                            $selected = (isset($editRoom['building_id']) && $editRoom['building_id'] == $row['building_id']) ? 'selected' : '';
+                                                            $selected = ($editRoom && $editRoom['building_id'] == $row['id']) ? 'selected' : '';
                                                     ?>
-                                                        <option value="<?php echo (int)$row['building_id']; ?>" <?php echo $selected; ?>>
-                                                            <?php echo sanitize($row['property_name']); ?> - <?php echo sanitize($row['building_name']); ?>
+                                                        <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
+                                                            <?php echo sanitize($row['name']); ?>
                                                         </option>
                                                     <?php endwhile; 
                                                         $stmt->close();
                                                     } catch (Exception $e) {
-                                                        $_SESSION['error_messages'][] = "Error fetching buildings: " . sanitize($e->getMessage());
+                                                        $_SESSION['error_messages'] = ["Error fetching buildings: " . sanitize($e->getMessage())];
                                                     }
                                                     ?>
                                                 </select>
@@ -509,22 +514,46 @@ $pageTitle = translate('rooms');
                                             <div class="form-group">
                                                 <label for="type_id"><?php echo translate('room_type'); ?>*</label>
                                                 <select class="form-control select2-modal" id="type_id" name="type_id" required>
-                                                    <option value=""><?php echo translate('select_type'); ?></option>
+                                                    <option value=""><?php echo translate('select_room_type'); ?></option>
                                                     <?php
                                                     try {
-                                                        $stmt = $conn->prepare("SELECT type_id, type_name FROM room_types ORDER BY type_name");
+                                                        $stmt = $conn->prepare("SELECT id, name FROM room_types ORDER BY name");
                                                         $stmt->execute();
                                                         $result = $stmt->get_result();
                                                         while ($row = $result->fetch_assoc()):
-                                                            $selected = (isset($editRoom['type_id']) && $editRoom['type_id'] == $row['type_id']) ? 'selected' : '';
+                                                            $selected = ($editRoom && $editRoom['type_id'] == $row['id']) ? 'selected' : '';
                                                     ?>
-                                                        <option value="<?php echo (int)$row['type_id']; ?>" <?php echo $selected; ?>>
-                                                            <?php echo sanitize($row['type_name']); ?>
+                                                        <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
+                                                            <?php echo sanitize($row['name']); ?>
                                                         </option>
                                                     <?php endwhile; 
                                                         $stmt->close();
                                                     } catch (Exception $e) {
-                                                        $_SESSION['error_messages'][] = "Error fetching room types: " . sanitize($e->getMessage());
+                                                        $_SESSION['error_messages'] = ["Error fetching room types: " . sanitize($e->getMessage())];
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="taxpayer_id"><?php echo translate('taxpayer'); ?></label>
+                                                <select class="form-control select2-modal" id="taxpayer_id" name="taxpayer_id">
+                                                    <option value=""><?php echo translate('select_taxpayer'); ?></option>
+                                                    <?php
+                                                    try {
+                                                        $stmt = $conn->prepare("SELECT id, business_name, tin, taxpayer_category FROM taxpayers ORDER BY business_name");
+                                                        $stmt->execute();
+                                                        $result = $stmt->get_result();
+                                                        while ($row = $result->fetch_assoc()):
+                                                            $category = $lang === 'am' ? ($row['taxpayer_category'] === 'A' ? 'ሀ' : ($row['taxpayer_category'] === 'B' ? 'ለ' : 'ሐ')) : $row['taxpayer_category'];
+                                                            $selected = ($editRoom && $editRoom['taxpayer_id'] == $row['id']) ? 'selected' : '';
+                                                    ?>
+                                                        <option value="<?php echo (int)$row['id']; ?>" <?php echo $selected; ?>>
+                                                            <?php echo sanitize($row['business_name']) . ' (TIN: ' . sanitize($row['tin']) . ', ' . translate('category') . ': ' . $category . ')'; ?>
+                                                        </option>
+                                                    <?php endwhile; 
+                                                        $stmt->close();
+                                                    } catch (Exception $e) {
+                                                        $_SESSION['error_messages'] = ["Error fetching taxpayers: " . sanitize($e->getMessage())];
                                                     }
                                                     ?>
                                                 </select>
@@ -533,14 +562,14 @@ $pageTitle = translate('rooms');
                                                 <label for="room_number"><?php echo translate('room_number'); ?>*</label>
                                                 <input type="text" class="form-control" id="room_number" name="room_number" required maxlength="50">
                                             </div>
+                                        </div>
+                                        <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="floor_number"><?php echo translate('floor_number'); ?>*</label>
                                                 <input type="number" class="form-control" id="floor_number" name="floor_number" required min="-10" max="100">
                                             </div>
-                                        </div>
-                                        <div class="col-md-6">
                                             <div class="form-group">
-                                                <label for="area"><?php echo translate('area'); ?> (sqm)*</label>
+                                                <label for="area"><?php echo translate('area'); ?> (m²)*</label>
                                                 <input type="number" step="0.01" class="form-control" id="area" name="area" required min="0">
                                             </div>
                                             <div class="form-group">
@@ -548,16 +577,20 @@ $pageTitle = translate('rooms');
                                                 <input type="number" step="0.01" class="form-control" id="monthly_rent" name="monthly_rent" required min="0">
                                             </div>
                                             <div class="form-group">
+                                                <label for="tax_rate"><?php echo translate('tax_rate'); ?> (%)*</label>
+                                                <input type="number" step="0.01" class="form-control" id="tax_rate" name="tax_rate" required min="0">
+                                            </div>
+                                            <div class="form-group">
                                                 <div class="custom-control custom-checkbox">
                                                     <input type="checkbox" class="custom-control-input" id="is_occupied" name="is_occupied">
-                                                    <label class="custom-control-label" for="is_occupied"><?php echo translate('currently_occupied'); ?></label>
+                                                    <label class="custom-control-label" for="is_occupied"><?php echo translate('is_occupied'); ?></label>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('close'); ?></button>
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><?php echo translate('cancel'); ?></button>
                                     <button type="submit" class="btn btn-primary" id="submitRoom"><?php echo translate('submit'); ?></button>
                                 </div>
                             </form>
@@ -589,7 +622,7 @@ $pageTitle = translate('rooms');
         </section>
     </div>
 
-    <!-- Main Footer -->
+    <!-- Footer -->
     <footer class="main-footer">
         <strong><?php echo $lang === 'am' ? 'የቅጂ መብት © ' . date('Y') . ' የግብር አስተዳደር ስርዓት' : 'Copyright © ' . date('Y') . ' Tax Management System'; ?>.</strong>
         <?php echo $lang === 'am' ? 'ሁሉም መብቶች የተጠበቁ ናቸው።' : 'All rights reserved.'; ?>
@@ -604,69 +637,59 @@ $pageTitle = translate('rooms');
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/admin-lte/3.2.0/js/adminlte.min.js"></script>
 
 <script>
-$(function () {
-    // Initialize DataTable with export buttons
+$(function() {
+    // Initialize DataTable
     $('.datatable').DataTable({
-        "paging": true,
-        "lengthChange": true,
-        "searching": true,
-        "ordering": true,
-        "info": true,
-        "autoWidth": false,
-        "responsive": true,
-        "buttons": ['copy', 'csv', 'excel', 'pdf', 'print'],
-        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-               '<"row"<"col-sm-12"tr>>' +
-               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-        "language": {
+        paging: true,
+        lengthChange: true,
+        searching: true,
+        ordering: true,
+        info: true,
+        autoWidth: false,
+        responsive: true,
+        buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>Btr<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        language: {
             <?php if ($lang === 'am'): ?>
-                "decimal": "",
-                "emptyTable": "ምንም ውሂብ የለም",
-                "info": "_TOTAL_ ከ _START_ እስከ _END_ ያሳያል",
-                "infoEmpty": "0 ከ 0 እስከ 0 ያሳያል",
-                "infoFiltered": "(_MAX_ ከጠቅላላ ተጣርቷል)",
-                "infoPostFix": "",
-                "thousands": ",",
-                "lengthMenu": "_MENU_ ግቤቶችን አሳይ",
-                "loadingRecords": "በመጫን ላይ...",
-                "processing": "በማቀነባበር ላይ...",
-                "search": "ፈልግ:",
-                "zeroRecords": "ምንም ተዛማጅ መዝገቦች አልተገኙም",
-                "paginate": {
-                    "first": "መጀመሪያ",
-                    "last": "መጨረሻ",
-                    "next": "ቀጣይ",
-                    "previous": "ቀዳሚ"
+                decimal: "",
+                emptyTable: "ምንም ውሂብ የለም",
+                info: "_TOTAL_ ከ _START_ እስከ _END_ ያሳይ",
+                infoEmpty: "0 ከ 0 እስከ 0 ያሳይ",
+                infoFiltered: "(_MAX_ ከሁሉ ተጣርቷል)",
+                lengthMenu: "_MENU_ ግ�ቶችን አሳይ",
+                loadingRecords: "በመጫን ላይ...",
+                processing: "በማቀነባበር ላይ...",
+                search: "ፈልግ:",
+                zeroRecords: "ምንም ተዛማጅ መዝገቦች አልተገኙም",
+                paginate: {
+                    first: "መጀመሪያ",
+                    last: "መጨረሻ",
+                    next: "ቀጣይ",
+                    previous: "ቀዳሚ"
                 },
-                "buttons": {
-                    "copy": "ቅጂ",
-                    "csv": "CSV",
-                    "excel": "Excel",
-                    "pdf": "PDF",
-                    "print": "አትም"
+                buttons: {
+                    copy: "ቅጂ",
+                    csv: "CSV",
+                    excel: "Excel",
+                    pdf: "PDF",
+                    print: "አትም"
                 }
             <?php endif; ?>
         }
     }).buttons().container().appendTo('.card-tools');
 
-    // Initialize Select2 for filters
-    $('.select2').select2({
-        theme: 'bootstrap4'
-    });
-
-    // Initialize Select2 for modal
+    // Initialize Select2
+    $('.select2').select2({ theme: 'bootstrap4' });
     function initializeModalSelect2() {
         $('.select2-modal').select2({
             theme: 'bootstrap4',
@@ -674,33 +697,31 @@ $(function () {
         });
     }
 
-    // Call Select2 initialization when modal is shown
-    $('#roomModal').on('shown.bs.modal', function () {
-        initializeModalSelect2();
-    });
+    $('#roomModal').on('shown.bs.modal', initializeModalSelect2);
 
-    // Reset form and Select2 when modal is hidden
-    $('#roomModal').on('hidden.bs.modal', function () {
+    // Reset modal form
+    $('#roomModal').on('hidden.bs.modal', function() {
         $('#roomForm')[0].reset();
         $('.select2-modal').val('').trigger('change');
         $('#edit_id').val('');
         $('#is_occupied').prop('checked', false);
         $('#submitRoom').text('<?php echo translate('submit'); ?>');
-        $('#roomModalLabel').text('<?php echo translate('add_new_room'); ?>');
+        $('#roomModalLabel').text('<?php echo translate('add_room'); ?>');
     });
 
-    // Handle modal show for create/edit
-    $('#roomModal').on('show.bs.modal', function (event) {
+    // Handle modal show
+    $('#roomModal').on('show.bs.modal', function(event) {
         var button = $(event.relatedTarget);
         var mode = button.data('mode');
         var modal = $(this);
 
         if (mode === 'create') {
-            modal.find('.modal-title').text('<?php echo translate('add_new_room'); ?>');
+            modal.find('.modal-title').text('<?php echo translate('add_room'); ?>');
             modal.find('#submitRoom').text('<?php echo translate('submit'); ?>');
             modal.find('#roomForm')[0].reset();
             modal.find('#building_id').val('').trigger('change');
             modal.find('#type_id').val('').trigger('change');
+            modal.find('#taxpayer_id').val('').trigger('change');
             modal.find('#edit_id').val('');
             modal.find('#is_occupied').prop('checked', false);
             <?php if (isset($_GET['building_id']) && is_numeric($_GET['building_id']) && $_GET['building_id'] > 0): ?>
@@ -709,26 +730,27 @@ $(function () {
         } else if (mode === 'edit') {
             modal.find('.modal-title').text('<?php echo translate('edit_room'); ?>');
             modal.find('#submitRoom').text('<?php echo translate('update'); ?>');
-
             var roomId = button.data('id');
             $('#edit_id').val(roomId);
             $('#building_id').val(button.data('building-id')).trigger('change');
             $('#type_id').val(button.data('type-id')).trigger('change');
+            $('#taxpayer_id').val(button.data('taxpayer-id')).trigger('change');
             $('#room_number').val(button.data('room-number'));
             $('#floor_number').val(button.data('floor-number'));
             $('#area').val(button.data('area'));
             $('#monthly_rent').val(button.data('monthly-rent'));
+            $('#tax_rate').val(button.data('tax-rate'));
             $('#is_occupied').prop('checked', button.data('is-occupied') == 1);
         }
     });
 
-    // Handle delete button click
+    // Handle delete
     $('.delete-room').on('click', function() {
         var roomId = $(this).data('id');
-        $('#deleteConfirm').attr('href', 'process_room.php?delete=' + roomId + '&csrf_token=<?php echo $_SESSION['csrf_token']; ?>');
+        $('#deleteConfirm').attr('href', 'process_rooms.php?delete=' + roomId + '&csrf_token=<?php echo $_SESSION['csrf_token']; ?>');
     });
 
-    // Auto-open modal for edit mode on page load
+    // Auto-open modal for edit
     <?php if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $_GET['edit'] > 0): ?>
     $(document).ready(function() {
         $('#roomModal').modal('show');
@@ -739,10 +761,12 @@ $(function () {
                     id: <?php echo (int)$_GET['edit']; ?>,
                     buildingId: <?php echo (int)$editRoom['building_id']; ?>,
                     typeId: <?php echo (int)$editRoom['type_id']; ?>,
+                    taxpayerId: <?php echo (int)($editRoom['taxpayer_id'] ?? ''); ?>,
                     roomNumber: '<?php echo htmlspecialchars(sanitize($editRoom['room_number'])); ?>',
                     floorNumber: <?php echo (int)$editRoom['floor_number']; ?>,
                     area: <?php echo number_format((float)$editRoom['area'], 2, '.', ''); ?>,
                     monthlyRent: <?php echo number_format((float)$editRoom['monthly_rent'], 2, '.', ''); ?>,
+                    taxRate: <?php echo number_format((float)$editRoom['tax_rate'], 2, '.', ''); ?>,
                     isOccupied: <?php echo (int)$editRoom['is_occupied']; ?>
                 }
             }

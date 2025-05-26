@@ -58,6 +58,42 @@ function formatCurrency($amount, $currency = 'ETB ') {
 }
 
 /**
+ * Log errors to a file and optionally display them
+ * @param Exception $e The exception to log
+ * @param bool $displayToUser Whether to display the error to the user
+ */
+function logError(Exception $e, $displayToUser = true) {
+    // Define log file path
+    $logFile = __DIR__ . '/../logs/error.log';
+    
+    // Create log directory if it doesn't exist
+    if (!file_exists(dirname($logFile))) {
+        mkdir(dirname($logFile), 0777, true);
+    }
+    
+    // Create log message
+    $message = sprintf(
+        "[%s] Error: %s in %s on line %d\nStack Trace: %s\n\n",
+        date('Y-m-d H:i:s'),
+        $e->getMessage(),
+        $e->getFile(),
+        $e->getLine(),
+        $e->getTraceAsString()
+    );
+    
+    // Write to log file
+    file_put_contents($logFile, $message, FILE_APPEND);
+    
+    // Display to user if needed
+    if ($displayToUser) {
+        $_SESSION['error_messages'][] = 'An error occurred. Please try again.';
+        if (isAdmin()) {
+            $_SESSION['error_messages'][] = 'Admin Debug: ' . $e->getMessage();
+        }
+    }
+}
+
+/**
  * Log an action to the system logs
  * @param mysqli $conn Database connection
  * @param int $user_id User performing the action
@@ -121,25 +157,8 @@ function logAction($conn, $user_id, $action, $record_id = null, $record_type = n
         }
     } catch (Exception $e) {
         // Fallback to file logging if database logging fails
-        $logMessage = sprintf(
-            "[%s] [User:%d] [IP:%s] %s %s%s",
-            date('Y-m-d H:i:s'),
-            $user_id,
-            $ip_address ?? 'unknown',
-            $action,
-            $record_id ? "(Record: $record_type#$record_id)" : "",
-            PHP_EOL
-        );
-        
-        // Log to file
-        file_put_contents(
-            __DIR__ . '/../logs/action_errors.log', 
-            $logMessage, 
-            FILE_APPEND
-        );
-        
-        // Log to PHP error log
-        error_log("Action logging failed: " . $e->getMessage());
+        logError($e, false);
+        return false;
     }
     
     return false;
@@ -477,6 +496,38 @@ function translate($key) {
             'contract_deleted' => 'Contract deleted successfully.',
             'failed_to_delete_contract' => 'Failed to delete contract',
             'invalid_csrf_token' => 'Invalid CSRF token.',
+             'transaction_management' => 'Transaction Management',
+            'list_of_transactions' => 'List of Transactions',
+            'add_transaction' => 'Add Transaction',
+            'edit_transaction' => 'Edit Transaction',
+            'transaction_not_found' => 'Transaction not found.',
+            'error_fetching_transaction' => 'Error fetching transaction',
+            'error_fetching_transactions' => 'Error fetching transactions',
+            'error_fetching_taxpayers' => 'Error fetching taxpayers',
+            'error_fetching_rooms' => 'Error fetching rooms',
+            'error_fetching_goods' => 'Error fetching goods',
+            'transaction_deleted_successfully' => 'Transaction deleted successfully.',
+            'failed_to_delete_transaction' => 'Failed to delete transaction.',
+            'error_deleting_transaction' => 'Error deleting transaction',
+            'all_fields_required' => 'All required fields must be filled correctly.',
+            'invalid_taxpayer' => 'Invalid taxpayer selected.',
+            'invalid_room_taxpayer_mismatch' => 'Selected room is not assigned to the selected taxpayer.',
+            'invalid_good' => 'Invalid good selected.',
+            'transaction_updated_successfully' => 'Transaction updated successfully.',
+            'failed_to_update_transaction' => 'Failed to update transaction.',
+            'transaction_added_successfully' => 'Transaction added successfully.',
+            'failed_to_add_transaction' => 'Failed to add transaction.',
+            'error_processing_transaction' => 'Error processing transaction',
+            'confirm_delete_transaction' => 'Are you sure you want to delete this transaction?',
+            'sale' => 'Sale',
+            'purchase' => 'Purchase',
+            'quantity' => 'Quantity',
+            'unit_price' => 'Unit Price',
+            'total_amount' => 'Total Amount',
+            'tax_amount' => 'Tax Amount',
+            'transaction_date' => 'Transaction Date',
+            'good' => 'Good',
+            'transaction_type' => 'Transaction Type',
             'required_fields_missing' => 'Required fields are missing.',
             'end_date_must_be_after_start_date' => 'End date must be after start date.',
             'invalid_room_selected' => 'Invalid room selected.',
@@ -484,7 +535,6 @@ function translate($key) {
             'overlapping_contract_exists' => 'An overlapping contract already exists.',
             'failed_to_save_contract' => 'Failed to save contract',
             'invalid_request' => 'Invalid request.',
-            // New keys for tax assessments page
             'rental_tax' => 'Rental Tax',
             'assessment_not_found' => 'Assessment not found.',
             'select_tax_rate' => 'Select Tax Rate',
@@ -509,6 +559,38 @@ function translate($key) {
             'reports' => 'ሪፖርቶች',
             'profile' => 'የእኔ መገለጫ',
             'logout' => 'ውጣ',
+            'transaction_management' => 'የግብይት አስተዳደር',
+            'list_of_transactions' => 'የግብይቶች ዝርዝር',
+            'add_transaction' => 'ግብይት ጨምር',
+            'edit_transaction' => 'ግብይት አስተካክል',
+            'transaction_not_found' => 'ግብይት አልተገኘም።',
+            'error_fetching_transaction' => 'ግብይት በመግኘት ላይ ስህተት',
+            'error_fetching_transactions' => 'ግብይቶች በመግኘት ላይ ስህተት',
+            'error_fetching_taxpayers' => 'ተጠቃሚዎች በመግኘት ላይ ስህተት',
+            'error_fetching_rooms' => 'ክፍሎች በመግኘት ላይ ስህተት',
+            'error_fetching_goods' => 'እቃዎች በመግኘት ላይ ስህተት',
+            'transaction_deleted_successfully' => 'ግብይት በተሳካ ሁኔታ ተሰርዟል።',
+            'failed_to_delete_transaction' => 'ግብይት መሰረዝ አልተሳካም።',
+            'error_deleting_transaction' => 'ግብይት በመሰረዝ ላይ ስህተት',
+            'all_fields_required' => 'ሁሉም አስፈላጊ መስኮች በትክክል መሞላት አለባቸው።',
+            'invalid_taxpayer' => 'ልክ ያልሆነ ተጠቃሚ ተመርጧል።',
+            'invalid_room_taxpayer_mismatch' => 'የተመረጠው ክፍል ከተመረጠው ተጠቃሚ ጋር አይዛመድም።',
+            'invalid_good' => 'ልክ ያልሆነ እቃ ተመርጧል።',
+            'transaction_updated_successfully' => 'ግብይት በተሳካ ሁኔታ ተዘምኗል።',
+            'failed_to_update_transaction' => 'ግብይት ማዘመን አልተሳካም።',
+            'transaction_added_successfully' => 'ግብይት በተሳካ ሁኔታ ተጨምሯል።',
+            'failed_to_add_transaction' => 'ግብይት መጨመር አልተሳካም።',
+            'error_processing_transaction' => 'ግብይት በማስኬድ ላይ ስህተት',
+            'confirm_delete_transaction' => 'ይህን ግብይት መሰረዝ መፈለግዎን እርግጠኛ ነዎት?',
+            'sale' => 'ሽያጭ',
+            'purchase' => 'ግዢ',
+            'quantity' => 'ብዛት',
+            'unit_price' => 'የአንድ ዋጋ',
+            'total_amount' => 'ጠቅላላ መጠን',
+            'tax_amount' => 'የግብር መጠን',
+            'transaction_date' => 'የግብይት ቀን',
+            'good' => 'እቃ',
+            'transaction_type' => 'የግብይት አይነት',
             'notifications' => 'ማሳወቂያዎች',
             'pending_tax_assessments' => 'በመጠባበቅ ላይ ያሉ የግብር ግምገማዎች',
             'see_all_notifications' => 'ሁሉንም ማሳወቂያዎች ተመልከት',

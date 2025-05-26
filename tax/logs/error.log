@@ -1,0 +1,75 @@
+[2025-05-26 04:57:54] Error: Unknown column 'is_active' in 'where clause' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 399
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(399): mysqli->query('SELECT * FROM t...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(42): fetchTaxpayers(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:13:58] Error: Unknown column 'is_active' in 'where clause' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 474
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(474): mysqli->query('SELECT * FROM t...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(42): fetchTaxpayers(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:15:41] Error: Unknown column 'is_active' in 'where clause' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 504
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(504): mysqli->query('SELECT * FROM t...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(42): fetchTaxpayers(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:38:38] Error: Unknown column 'type_code' in 'field list' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 483
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(483): mysqli->query('SELECT type_cod...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(45): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:45:07] Error: Unknown column 'type_code' in 'field list' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 483
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(483): mysqli->query('SELECT type_cod...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(45): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:45:10] Error: Unknown column 'type_code' in 'field list' in C:\xampp\htdocs\gebi1\tax\taxpayers.php on line 483
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\taxpayers.php(483): mysqli->query('SELECT type_cod...')
+#1 C:\xampp\htdocs\gebi1\tax\taxpayers.php(45): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:47:33] Error: Unknown column 'tr.name' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 315
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(315): mysqli->query('\r\n            S...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(30): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:47:33] Error: Unknown column 'id' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 330
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(330): mysqli->query('SELECT id, name...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(31): fetchTaxRates(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:48:53] Error: Unknown column 'tr.name' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 315
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(315): mysqli->query('\r\n            S...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(30): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:48:53] Error: Unknown column 'id' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 330
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(330): mysqli->query('SELECT id, name...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(31): fetchTaxRates(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:50:14] Error: Unknown column 'tr.name' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 315
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(315): mysqli->query('\r\n            S...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(30): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:50:14] Error: Unknown column 'id' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 330
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(330): mysqli->query('SELECT id, name...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(31): fetchTaxRates(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:50:16] Error: Unknown column 'vt.vehicle_type_id' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_tax.php on line 530
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_tax.php(530): mysqli->query('SELECT vt.vehic...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_tax.php(46): fetchVehicleTaxes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:53:36] Error: Unknown column 'tr.name' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 315
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(315): mysqli->query('\r\n            S...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(30): fetchVehicleTypes(Object(mysqli))
+#2 {main}
+
+[2025-05-26 05:53:36] Error: Unknown column 'id' in 'field list' in C:\xampp\htdocs\gebi1\tax\vehicle_types.php on line 330
+Stack Trace: #0 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(330): mysqli->query('SELECT id, name...')
+#1 C:\xampp\htdocs\gebi1\tax\vehicle_types.php(31): fetchTaxRates(Object(mysqli))
+#2 {main}
+

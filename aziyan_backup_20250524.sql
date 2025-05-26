@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 25, 2025 at 08:16 PM
+-- Generation Time: May 26, 2025 at 06:11 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -386,6 +386,23 @@ INSERT INTO `construction_types` (`id`, `name`, `description`, `durability_ratin
 (6, 'Brick', 'Brick masonry construction', 'Medium', '2025-04-11 21:26:31', '2025-04-11 21:26:31'),
 (7, 'Composite', 'Mixed construction materials', 'High', '2025-04-11 21:26:31', '2025-04-11 21:26:31'),
 (8, 'Prefabricated', 'Factory-made components', 'Medium', '2025-04-11 21:26:31', '2025-04-11 21:26:31');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `goods`
+--
+
+CREATE TABLE `goods` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `category` enum('perishable','luxury','industrial','basic','excisable') NOT NULL,
+  `vat_exempt` tinyint(1) DEFAULT 0,
+  `tot_rate` decimal(5,2) DEFAULT 0.00,
+  `excise_rate` decimal(5,2) DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_vat_exempt` tinyint(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -801,7 +818,8 @@ CREATE TABLE `rent_contracts` (
 --
 
 INSERT INTO `rent_contracts` (`contract_id`, `room_id`, `tenant_name`, `tenant_phone`, `tenant_id_number`, `start_date`, `end_date`, `monthly_rent`, `deposit_amount`, `status`, `notes`) VALUES
-(1, 2, 'kemal', '09123456', '00000012', '2025-05-25', '2026-05-30', 900.00, 500.00, 'active', 'as we ----------');
+(1, 2, 'kemal', '09123456', '00000012', '2025-05-25', '2026-05-30', 900.00, 500.00, 'active', 'as we ----------'),
+(2, 3, 'habib', '091234569', '00000016', '2025-05-25', '2026-05-25', 1000.00, 5000.00, 'active', 'vvvv');
 
 -- --------------------------------------------------------
 
@@ -821,16 +839,20 @@ CREATE TABLE `rooms` (
   `last_occupied_date` date DEFAULT NULL,
   `days_vacant` int(11) DEFAULT 0,
   `last_reported_date` date DEFAULT NULL,
-  `reporting_status` enum('reported','pending','non-compliant') DEFAULT 'pending'
+  `reporting_status` enum('reported','pending','non-compliant') DEFAULT 'pending',
+  `taxpayer_id` int(11) DEFAULT NULL,
+  `tax_rate` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `tax_amount` decimal(10,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `rooms`
 --
 
-INSERT INTO `rooms` (`room_id`, `building_id`, `type_id`, `room_number`, `floor_number`, `area`, `monthly_rent`, `is_occupied`, `last_occupied_date`, `days_vacant`, `last_reported_date`, `reporting_status`) VALUES
-(1, 1, 2, '20', 4, 20.00, 1000.00, 1, NULL, 0, NULL, 'pending'),
-(2, 1, 1, '19', 4, 15.00, 800.00, 1, NULL, 0, NULL, 'pending');
+INSERT INTO `rooms` (`room_id`, `building_id`, `type_id`, `room_number`, `floor_number`, `area`, `monthly_rent`, `is_occupied`, `last_occupied_date`, `days_vacant`, `last_reported_date`, `reporting_status`, `taxpayer_id`, `tax_rate`, `tax_amount`) VALUES
+(1, 1, 2, '20', 4, 20.00, 1000.00, 1, NULL, 0, NULL, 'pending', NULL, 0.00, 0.00),
+(2, 1, 1, '19', 4, 15.00, 800.00, 1, NULL, 0, NULL, 'pending', NULL, 0.00, 0.00),
+(3, 2, 3, '16', 3, 30.00, 1000.00, 1, NULL, 0, NULL, 'pending', NULL, 0.00, 0.00);
 
 -- --------------------------------------------------------
 
@@ -1003,7 +1025,8 @@ INSERT INTO `system_logs` (`log_id`, `user_id`, `action`, `action_date`, `ip_add
 (3, 1, 'Updated assessment ID 2 status to paid', '2025-05-24 19:25:40', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 2, 'assessment'),
 (4, 1, 'Created assessment ID 3', '2025-05-24 20:15:02', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 3, 'tax_assessments'),
 (5, 1, 'Recorded payment ID 1 for assessment ID 3', '2025-05-24 21:15:44', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 1, 'payment'),
-(6, 1, 'Auto-updated assessment ID 3 to paid after payment', '2025-05-24 21:15:44', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 3, 'tax_assessments');
+(6, 1, 'Auto-updated assessment ID 3 to paid after payment', '2025-05-24 21:15:44', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 3, 'tax_assessments'),
+(7, 1, 'Created contract', '2025-05-25 11:15:52', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0', 2, 'rent_contract');
 
 -- --------------------------------------------------------
 
@@ -1034,6 +1057,25 @@ INSERT INTO `system_settings` (`id`, `setting_key`, `setting_value`, `descriptio
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `taxpayers`
+--
+
+CREATE TABLE `taxpayers` (
+  `id` int(11) NOT NULL,
+  `tin` varchar(20) NOT NULL,
+  `business_name` varchar(100) NOT NULL,
+  `owner_name` varchar(100) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `registration_type` enum('sole_proprietorship','partnership','plc') NOT NULL,
+  `taxpayer_category` enum('A','B','C') NOT NULL DEFAULT 'C',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tax_assessments`
 --
 
@@ -1060,7 +1102,54 @@ CREATE TABLE `tax_assessments` (
 
 INSERT INTO `tax_assessments` (`assessment_id`, `contract_id`, `property_id`, `building_id`, `rate_id`, `assessment_date`, `due_date`, `period_month`, `assessed_value`, `tax_amount`, `fiscal_year`, `status`, `is_rental`, `notes`) VALUES
 (2, NULL, 1, 1, 4, '2025-05-24', NULL, 0, 70000.00, 1050.00, '2025', 'paid', 0, 'tttttttttttt'),
-(3, NULL, 2, 2, 4, '2025-05-25', '2025-05-31', 0, 5000000.00, 75000.00, '2025', 'paid', 0, 'ggggggg');
+(3, NULL, 2, 2, 4, '2025-05-25', '2025-05-31', 0, 5000000.00, 75000.00, '2025', 'paid', 0, 'ggggggg'),
+(4, 1, NULL, NULL, 6, '2025-05-25', NULL, 5, 500.00, 150.00, '2025', 'pending', 1, 'mmmmm');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tax_rate`
+--
+
+CREATE TABLE `tax_rate` (
+  `rate_id` int(11) NOT NULL,
+  `rate_name` varchar(100) NOT NULL COMMENT 'Human-readable name of the tax rate',
+  `rate_code` varchar(20) NOT NULL COMMENT 'Unique code for system reference (e.g., VAT-15)',
+  `rate_description` text DEFAULT NULL COMMENT 'Detailed description of the tax',
+  `rate_percentage` decimal(5,2) DEFAULT NULL COMMENT 'Percentage rate (NULL if fixed amount)',
+  `fixed_amount` decimal(10,2) DEFAULT NULL COMMENT 'Fixed tax amount (NULL if percentage)',
+  `minimum_amount` decimal(10,2) DEFAULT NULL COMMENT 'Minimum tax amount required',
+  `maximum_amount` decimal(10,2) DEFAULT NULL COMMENT 'Maximum tax amount cap',
+  `applicable_to` enum('property','building','rental','vehicle','business','other') NOT NULL COMMENT 'What entity this tax applies to',
+  `category` enum('A','B','C','D') DEFAULT NULL COMMENT 'Taxpayer category for differentiated rates',
+  `calculation_method` enum('percentage','fixed','tiered') NOT NULL DEFAULT 'percentage' COMMENT 'How tax is calculated',
+  `effective_date` date NOT NULL COMMENT 'When this rate becomes active',
+  `expiry_date` date DEFAULT NULL COMMENT 'When this rate expires (NULL for ongoing)',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1=active, 0=inactive',
+  `requires_approval` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'If application requires approval',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  `created_by` int(11) DEFAULT NULL COMMENT 'User who created this rate',
+  `updated_by` int(11) DEFAULT NULL COMMENT 'User who last updated this rate'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Master table for all tax rates in the system';
+
+--
+-- Triggers `tax_rate`
+--
+DELIMITER $$
+CREATE TRIGGER `before_tax_rate_insert` BEFORE INSERT ON `tax_rate` FOR EACH ROW BEGIN
+    IF (NEW.rate_percentage IS NULL AND NEW.fixed_amount IS NULL) THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Either percentage or fixed amount must be set';
+    END IF;
+    
+    IF (NEW.expiry_date IS NOT NULL AND NEW.expiry_date <= NEW.effective_date) THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Expiry date must be after effective date';
+    END IF;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -1070,9 +1159,11 @@ INSERT INTO `tax_assessments` (`assessment_id`, `contract_id`, `property_id`, `b
 
 CREATE TABLE `tax_rates` (
   `rate_id` int(11) NOT NULL,
-  `rate_name` varchar(100) NOT NULL,
+  `rate_name` varchar(150) NOT NULL,
   `rate_description` text DEFAULT NULL,
-  `rate_percentage` decimal(5,2) NOT NULL,
+  `authority_reference` varchar(50) DEFAULT NULL,
+  `law_reference` varchar(100) DEFAULT NULL,
+  `rate_percentage` decimal(5,2) DEFAULT NULL,
   `applicable_to` enum('property','building','rental') NOT NULL,
   `effective_date` date NOT NULL,
   `expiry_date` date DEFAULT NULL
@@ -1082,15 +1173,38 @@ CREATE TABLE `tax_rates` (
 -- Dumping data for table `tax_rates`
 --
 
-INSERT INTO `tax_rates` (`rate_id`, `rate_name`, `rate_description`, `rate_percentage`, `applicable_to`, `effective_date`, `expiry_date`) VALUES
-(1, 'የአፍር ግብር - Residential', 'Residential property tax rate', 0.50, 'property', '2023-01-01', NULL),
-(2, 'የአፍር ግብር - Commercial', 'Commercial property tax rate', 1.00, 'property', '2023-01-01', NULL),
-(3, 'የህንጻ ግብር - Residential', 'Residential building tax rate', 0.75, 'building', '2023-01-01', NULL),
-(4, 'የህንጻ ግብር - Commercial', 'Commercial building tax rate', 1.50, 'building', '2023-01-01', NULL),
-(5, 'የአከራይተከራይ ግብር - Individual', 'Individual rental income tax', 15.00, 'rental', '2023-01-01', NULL),
-(6, 'የአከራይተከራይ ግብር - Business', 'Business rental income tax', 30.00, 'rental', '2023-01-01', NULL),
-(7, 'የባለቤት የመጀመሪያ ቤት ነፃነት', 'Primary residence exemption', 0.00, 'property', '2023-01-01', NULL),
-(8, 'የታሪካዊ ህንጻዎች ተቀናሽ', 'Historical buildings discount', 0.25, 'building', '2023-01-01', '2025-12-31');
+INSERT INTO `tax_rates` (`rate_id`, `rate_name`, `rate_description`, `authority_reference`, `law_reference`, `rate_percentage`, `applicable_to`, `effective_date`, `expiry_date`) VALUES
+(1, 'የአፍር ግብር - Residential', 'Residential property tax rate', NULL, NULL, 0.50, 'property', '2023-01-01', NULL),
+(2, 'የአፍር ግብር - Commercial', 'Commercial property tax rate', NULL, NULL, 1.00, 'property', '2023-01-01', NULL),
+(3, 'የህንጻ ግብር - Residential', 'Residential building tax rate', NULL, NULL, 0.75, 'building', '2023-01-01', NULL),
+(4, 'የህንጻ ግብር - Commercial', 'Commercial building tax rate', NULL, NULL, 1.50, 'building', '2023-01-01', NULL),
+(5, 'የአከራይተከራይ ግብር - Individual', 'Individual rental income tax', NULL, NULL, 15.00, 'rental', '2023-01-01', NULL),
+(6, 'የአከራይተከራይ ግብር - Business', 'Business rental income tax', NULL, NULL, 30.00, 'rental', '2023-01-01', NULL),
+(7, 'የባለቤት የመጀመሪያ ቤት ነፃነት', 'Primary residence exemption', NULL, NULL, 0.00, 'property', '2023-01-01', NULL),
+(8, 'የታሪካዊ ህንጻዎች ተቀናሽ', 'Historical buildings discount', NULL, NULL, 0.25, 'building', '2023-01-01', '2025-12-31');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `transactions`
+--
+
+CREATE TABLE `transactions` (
+  `id` int(11) NOT NULL,
+  `taxpayer_id` int(11) NOT NULL,
+  `good_id` int(11) NOT NULL,
+  `room_id` int(11) DEFAULT NULL,
+  `transaction_type` enum('retail','wholesale') DEFAULT 'retail',
+  `amount` decimal(10,2) NOT NULL,
+  `tax_collected` decimal(10,2) NOT NULL,
+  `payment_date` date NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `tax_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `transaction_date` date DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -1159,6 +1273,70 @@ CREATE TABLE `vacancy_reports` (
   `report_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`report_data`)),
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `vehicle_taxes`
+--
+
+CREATE TABLE `vehicle_taxes` (
+  `id` int(11) NOT NULL,
+  `plate_number` varchar(20) NOT NULL,
+  `owner_name` varchar(100) NOT NULL,
+  `vehicle_type_id` int(11) DEFAULT NULL,
+  `tax_year` int(4) NOT NULL,
+  `tax_amount` decimal(10,2) NOT NULL,
+  `payment_status` enum('pending','paid','overdue') NOT NULL DEFAULT 'pending',
+  `engine_number` varchar(50) DEFAULT NULL,
+  `chassis_number` varchar(50) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `vehicle_tax_payments`
+--
+
+CREATE TABLE `vehicle_tax_payments` (
+  `id` int(11) NOT NULL,
+  `vehicle_tax_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_date` date NOT NULL,
+  `payment_method` enum('cash','bank','mobile','check') NOT NULL,
+  `reference_number` varchar(50) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `received_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `vehicle_types`
+--
+
+CREATE TABLE `vehicle_types` (
+  `id` int(11) NOT NULL,
+  `name` varchar(50) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `tax_rate_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `vehicle_types`
+--
+
+INSERT INTO `vehicle_types` (`id`, `name`, `description`, `tax_rate_id`, `created_at`, `updated_at`) VALUES
+(1, 'Sedan', '4-door passenger vehicle', 1, '2025-05-26 02:34:36', NULL),
+(2, 'SUV', 'Sports utility vehicle', 1, '2025-05-26 02:34:36', NULL),
+(3, 'Truck', 'Commercial cargo vehicle', 2, '2025-05-26 02:34:36', NULL),
+(4, 'Motorcycle', '2-wheel vehicle', 3, '2025-05-26 02:34:36', NULL);
 
 -- --------------------------------------------------------
 
@@ -1275,6 +1453,12 @@ ALTER TABLE `construction_types`
   ADD UNIQUE KEY `name` (`name`);
 
 --
+-- Indexes for table `goods`
+--
+ALTER TABLE `goods`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `government_agencies`
 --
 ALTER TABLE `government_agencies`
@@ -1383,7 +1567,8 @@ ALTER TABLE `rent_contracts`
 ALTER TABLE `rooms`
   ADD PRIMARY KEY (`room_id`),
   ADD KEY `building_id` (`building_id`),
-  ADD KEY `type_id` (`type_id`);
+  ADD KEY `type_id` (`type_id`),
+  ADD KEY `taxpayer_id` (`taxpayer_id`);
 
 --
 -- Indexes for table `room_types`
@@ -1443,6 +1628,13 @@ ALTER TABLE `system_settings`
   ADD KEY `updated_by` (`updated_by`);
 
 --
+-- Indexes for table `taxpayers`
+--
+ALTER TABLE `taxpayers`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `tin` (`tin`);
+
+--
 -- Indexes for table `tax_assessments`
 --
 ALTER TABLE `tax_assessments`
@@ -1454,10 +1646,32 @@ ALTER TABLE `tax_assessments`
   ADD KEY `idx_status_due_date` (`status`,`due_date`);
 
 --
+-- Indexes for table `tax_rate`
+--
+ALTER TABLE `tax_rate`
+  ADD PRIMARY KEY (`rate_id`),
+  ADD UNIQUE KEY `rate_code_unique` (`rate_code`),
+  ADD UNIQUE KEY `idx_unique_active_rate` (`applicable_to`,`category`,`effective_date`,`is_active`) COMMENT 'Prevent duplicate active rates for same category',
+  ADD KEY `idx_applicable_to` (`applicable_to`),
+  ADD KEY `idx_effective_date` (`effective_date`),
+  ADD KEY `idx_active` (`is_active`),
+  ADD KEY `fk_tax_rate_creator` (`created_by`),
+  ADD KEY `fk_tax_rate_updater` (`updated_by`);
+
+--
 -- Indexes for table `tax_rates`
 --
 ALTER TABLE `tax_rates`
   ADD PRIMARY KEY (`rate_id`);
+
+--
+-- Indexes for table `transactions`
+--
+ALTER TABLE `transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `taxpayer_id` (`taxpayer_id`),
+  ADD KEY `good_id` (`good_id`),
+  ADD KEY `room_id` (`room_id`);
 
 --
 -- Indexes for table `unpaid_payments`
@@ -1481,6 +1695,31 @@ ALTER TABLE `vacancy_reports`
   ADD PRIMARY KEY (`id`),
   ADD KEY `agency_id` (`agency_id`),
   ADD KEY `submitted_by` (`submitted_by`);
+
+--
+-- Indexes for table `vehicle_taxes`
+--
+ALTER TABLE `vehicle_taxes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `plate_year_unique` (`plate_number`,`tax_year`),
+  ADD KEY `fk_vehicle_tax_type` (`vehicle_type_id`),
+  ADD KEY `fk_vehicle_tax_creator` (`created_by`);
+
+--
+-- Indexes for table `vehicle_tax_payments`
+--
+ALTER TABLE `vehicle_tax_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_vehicle_payment_tax` (`vehicle_tax_id`),
+  ADD KEY `fk_vehicle_payment_receiver` (`received_by`);
+
+--
+-- Indexes for table `vehicle_types`
+--
+ALTER TABLE `vehicle_types`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name_unique` (`name`),
+  ADD KEY `fk_vehicle_type_tax_rate` (`tax_rate_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -1533,6 +1772,12 @@ ALTER TABLE `charges`
 --
 ALTER TABLE `construction_types`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT for table `goods`
+--
+ALTER TABLE `goods`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `government_agencies`
@@ -1622,13 +1867,13 @@ ALTER TABLE `rental_payments`
 -- AUTO_INCREMENT for table `rent_contracts`
 --
 ALTER TABLE `rent_contracts`
-  MODIFY `contract_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `contract_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `rooms`
 --
 ALTER TABLE `rooms`
-  MODIFY `room_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `room_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `room_types`
@@ -1664,7 +1909,7 @@ ALTER TABLE `sms_templates`
 -- AUTO_INCREMENT for table `system_logs`
 --
 ALTER TABLE `system_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -1673,16 +1918,34 @@ ALTER TABLE `system_settings`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT for table `taxpayers`
+--
+ALTER TABLE `taxpayers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `tax_assessments`
 --
 ALTER TABLE `tax_assessments`
-  MODIFY `assessment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `assessment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `tax_rate`
+--
+ALTER TABLE `tax_rate`
+  MODIFY `rate_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tax_rates`
 --
 ALTER TABLE `tax_rates`
   MODIFY `rate_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT for table `transactions`
+--
+ALTER TABLE `transactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `unpaid_payments`
@@ -1701,6 +1964,24 @@ ALTER TABLE `users`
 --
 ALTER TABLE `vacancy_reports`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `vehicle_taxes`
+--
+ALTER TABLE `vehicle_taxes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `vehicle_tax_payments`
+--
+ALTER TABLE `vehicle_tax_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `vehicle_types`
+--
+ALTER TABLE `vehicle_types`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables
@@ -1795,7 +2076,9 @@ ALTER TABLE `rent_contracts`
 --
 ALTER TABLE `rooms`
   ADD CONSTRAINT `rooms_ibfk_1` FOREIGN KEY (`building_id`) REFERENCES `buildings` (`building_id`),
-  ADD CONSTRAINT `rooms_ibfk_2` FOREIGN KEY (`type_id`) REFERENCES `room_types` (`type_id`);
+  ADD CONSTRAINT `rooms_ibfk_2` FOREIGN KEY (`type_id`) REFERENCES `room_types` (`type_id`),
+  ADD CONSTRAINT `rooms_ibfk_3` FOREIGN KEY (`taxpayer_id`) REFERENCES `taxpayers` (`id`),
+  ADD CONSTRAINT `rooms_ibfk_4` FOREIGN KEY (`taxpayer_id`) REFERENCES `taxpayers` (`id`);
 
 --
 -- Constraints for table `tax_assessments`
@@ -1807,11 +2090,46 @@ ALTER TABLE `tax_assessments`
   ADD CONSTRAINT `tax_assessments_ibfk_4` FOREIGN KEY (`contract_id`) REFERENCES `rent_contracts` (`contract_id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `tax_rate`
+--
+ALTER TABLE `tax_rate`
+  ADD CONSTRAINT `fk_tax_rate_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_tax_rate_updater` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `transactions`
+--
+ALTER TABLE `transactions`
+  ADD CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`taxpayer_id`) REFERENCES `taxpayers` (`id`),
+  ADD CONSTRAINT `transactions_ibfk_2` FOREIGN KEY (`good_id`) REFERENCES `goods` (`id`),
+  ADD CONSTRAINT `transactions_ibfk_3` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`);
+
+--
 -- Constraints for table `vacancy_reports`
 --
 ALTER TABLE `vacancy_reports`
   ADD CONSTRAINT `vacancy_reports_ibfk_1` FOREIGN KEY (`agency_id`) REFERENCES `government_agencies` (`id`),
   ADD CONSTRAINT `vacancy_reports_ibfk_2` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `vehicle_taxes`
+--
+ALTER TABLE `vehicle_taxes`
+  ADD CONSTRAINT `fk_vehicle_tax_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_vehicle_tax_type` FOREIGN KEY (`vehicle_type_id`) REFERENCES `vehicle_types` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `vehicle_tax_payments`
+--
+ALTER TABLE `vehicle_tax_payments`
+  ADD CONSTRAINT `fk_vehicle_payment_receiver` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_vehicle_payment_tax` FOREIGN KEY (`vehicle_tax_id`) REFERENCES `vehicle_taxes` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `vehicle_types`
+--
+ALTER TABLE `vehicle_types`
+  ADD CONSTRAINT `fk_vehicle_type_tax_rate` FOREIGN KEY (`tax_rate_id`) REFERENCES `tax_rates` (`rate_id`) ON DELETE SET NULL;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
