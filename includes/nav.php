@@ -54,7 +54,7 @@ if (isset($_GET['lang'])) {
                     <i class="fas fa-user-circle mr-2"></i> <?php echo $lang === 'am' ? 'መገለጫ' : 'Profile'; ?>
                 </a>
                 <div class="dropdown-divider"></div>
-                <a href="../logout.php" class="dropdown-item">
+                <a href="logout.php" class="dropdown-item">
                     <i class="fas fa-sign-out-alt mr-2"></i> <?php echo $lang === 'am' ? 'ውጣ' : 'Logout'; ?>
                 </a>
             </div>
