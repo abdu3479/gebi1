@@ -534,6 +534,12 @@ if (in_array($role, ['admin', 'billing_officer'])) {
                             </a>
                         </li>
                     <?php endif; ?>
+                    <li class="nav-item">
+                            <a href="../vot/index.html" class="nav-link <?php echo $current_page === 'index.html' ? 'active' : ''; ?>">
+                                <i class="nav-icon fas fa-plus"></i>
+                                <p class="amharic"><?php echo htmlspecialchars($translations[$lang]['CSSMS'] ?? ($lang === 'am' ? 'መዝገቦችን ይፍጠሩ' : 'CSSMS')); ?></p>
+                            </a>
+                        </li>
                 </ul>
             </nav>
         </div>
