@@ -2132,6 +2132,34 @@ ALTER TABLE `vehicle_types`
   ADD CONSTRAINT `fk_vehicle_type_tax_rate` FOREIGN KEY (`tax_rate_id`) REFERENCES `tax_rates` (`rate_id`) ON DELETE SET NULL;
 COMMIT;
 
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+CREATE TABLE voice_call_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  owner_id INT NOT NULL,
+  bill_id INT,
+  phone_number VARCHAR(20) NOT NULL,
+  call_status ENUM('initiated','ringing','answered','no_answer','busy','failed','completed') DEFAULT 'initiated',
+  call_duration INT DEFAULT 0, -- በሰከንድ
+  recording_url VARCHAR(255),
+  transcript TEXT, -- የውይይት ጽሑፍ (speech-to-text)
+  payment_agreed TINYINT(1) DEFAULT 0,
+  agreed_payment_date DATE,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES owners(id),
+  FOREIGN KEY (bill_id) REFERENCES bills(id)
+);
+
+CREATE TABLE voice_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  language ENUM('am','en','om') DEFAULT 'am',
+  script TEXT NOT NULL, -- የድምጽ ስርዓተ ጽሑፍ
+  variables VARCHAR(255), -- {{amount}}, {{due_date}}, {{owner_name}}
+  audio_file_path VARCHAR(255), -- የተቀዳ ድምጽ (TTS)
+  is_active TINYINT(1) DEFAULT 1
+);
+
+
+ALTER TABLE owners ADD COLUMN preferred_contact ENUM('sms','voice','both') DEFAULT 'both';
+ALTER TABLE owners ADD COLUMN voice_call_consent TINYINT(1) DEFAULT 0;
